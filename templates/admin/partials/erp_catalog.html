@@ -1,0 +1,72 @@
+{# Integração ERP — sincronização do catálogo. Renderizado também por admin_erp_live (painel ao vivo, static/js/admin-erp-live.js). #}
+<header class="admin-section__header admin-section__header--row">
+    <div>
+        <h2 class="admin-section__title">Catálogo</h2>
+        <p class="admin-section__subtitle">
+            {{ link_summary.linked }} produto(s) vinculado(s) a um CODPROD.
+            A sincronização traz só o que mudou no ERP desde a última vez (preços,
+            cadastros e estoque "Aguard. Integração", de 20 em 20) e marca cada lote como
+            integrado. Do estoque, o Go Sell guarda só os lotes por local, para o pedido.
+            Sem imagem, mantém a foto.
+        </p>
+    </div>
+    <form method="post" action="{{ url_for('admin_sync_catalog_erp') }}" data-erp-action>
+        {% include 'partials/csrf_field.html' %}
+        <button type="submit" class="admin-btn admin-btn--primary" {% if sync_running or api_missing %}disabled{% endif %}>
+            <i class="fa-solid fa-arrows-rotate{% if sync_running %} fa-spin{% endif %}" aria-hidden="true"></i>
+            {% if sync_running %}Sincronizando…{% else %}Sincronizar catálogo{% endif %}
+        </button>
+    </form>
+</header>
+{% set running_run = sync_runs | selectattr('status', 'equalto', 'executando') | first %}
+{% if running_run %}
+<div class="erp-sync-progress" role="status">
+    <div class="erp-sync-progress__head">
+        <i class="fa-solid fa-arrows-rotate fa-spin" aria-hidden="true"></i>
+        <strong>Sincronizando com o ERP</strong>
+        <span class="erp-sync-progress__since">desde {{ running_run.started_at | datahora }}</span>
+    </div>
+    <p class="erp-sync-progress__step">{{ running_run.message or 'Iniciando…' }}</p>
+    <dl class="erp-sync-progress__counts">
+        <div><dt>Novos</dt><dd>{{ running_run.inserted }}</dd></div>
+        <div><dt>Atualizados</dt><dd>{{ running_run.updated }}</dd></div>
+        <div><dt>Sem mudança</dt><dd>{{ running_run.unchanged }}</dd></div>
+        <div><dt>Fotos novas</dt><dd>{{ running_run.images }}</dd></div>
+        <div><dt>Avisos</dt><dd>{{ running_run.warnings }}</dd></div>
+    </dl>
+    <div class="erp-sync-progress__bar" aria-hidden="true"><span></span></div>
+</div>
+{% endif %}
+{% if sync_runs %}
+<div class="erp-table-wrap">
+    <table class="erp-table">
+        <thead>
+            <tr><th>Início</th><th>Situação</th><th class="num">Novos</th><th class="num">Atualizados</th><th class="num">Sem mudança</th><th class="num" title="Fotos novas ou trocadas nesta sincronização">Fotos novas</th><th>Avisos</th></tr>
+        </thead>
+        <tbody>
+            {% for run in sync_runs %}
+            <tr data-erp-row="run-{{ run.id }}" data-erp-row-state="{{ run.status }}">
+                <td>{{ run.started_at | datahora }}</td>
+                <td>
+                    <span class="admin-badge {% if run.status == 'ok' %}admin-badge--success{% elif run.status == 'erro' %}admin-badge--danger{% elif run.status == 'parcial' %}admin-badge--warn{% else %}admin-badge--info{% endif %}">{{ {'ok': 'Concluída', 'parcial': 'Concluída com avisos', 'erro': 'Falhou', 'executando': 'Em andamento'}.get(run.status, run.status) }}</span>
+                </td>
+                <td class="num">{{ run.inserted }}</td>
+                <td class="num">{{ run.updated }}</td>
+                <td class="num">{{ run.unchanged }}</td>
+                <td class="num">{{ run.images }}</td>
+                <td class="erp-table__error">
+                    {% if run.error %}{{ run.error }}{% endif %}
+                    {% if run.status == 'executando' %}
+                    <span class="erp-sync-progress__inline">{{ run.message or 'Iniciando…' }}</span>
+                    {% elif run.message %}
+                    <details data-erp-keep="run-{{ run.id }}"><summary>{{ run.warnings }} aviso(s)</summary><pre>{{ run.message }}</pre></details>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p class="erp-empty">Nenhuma sincronização com o ERP ainda.</p>
+{% endif %}

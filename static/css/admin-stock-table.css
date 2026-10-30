@@ -1,0 +1,702 @@
+/* Tabela de estoque do evento — templates/admin/event_stock.html (.admin-stockv)
+   O admin-stock-live.js troca a classe do selo de situação (admin-badge--<tipo>)
+   e reescreve o número do estoque; as cores da linha saem do selo via :has(),
+   então acompanham a atualização ao vivo sem JavaScript extra.
+   A biblioteca de produtos (.admin-stockv--library) e o estoque do painel do
+   vendedor (.admin-stockv--seller) usam a mesma grade, com variantes no fim. */
+
+.admin-stockv {
+    --sv-success: #0c8a4d;
+    --sv-success-bg: rgba(15, 157, 88, 0.11);
+    --sv-warn: #a5620a;
+    --sv-warn-bg: rgba(232, 137, 11, 0.13);
+    --sv-danger: #b91c1c;
+    --sv-danger-bg: rgba(220, 38, 38, 0.09);
+    --sv-promo: #6d28d9;
+    --sv-promo-bg: rgba(124, 58, 237, 0.10);
+    --sv-neutral-bg: var(--color-bg);
+    --sv-row-hover: rgba(14, 116, 144, 0.025);
+    --sv-row-selected: rgba(14, 116, 144, 0.05);
+    --sv-cols: 30px minmax(260px, 3fr) minmax(112px, 0.9fr) 76px 86px 76px minmax(190px, 1.5fr) 84px;
+
+    border: 1px solid var(--color-border);
+    font-size: 13.5px;
+}
+
+html.admin-theme--dark .admin-stockv {
+    --sv-success: var(--admin-success);
+    --sv-success-bg: var(--admin-success-bg);
+    --sv-warn: var(--admin-warn);
+    --sv-warn-bg: var(--admin-warn-bg);
+    --sv-danger: var(--admin-danger);
+    --sv-danger-bg: var(--admin-danger-bg);
+    --sv-promo: #c4b5fd;
+    --sv-promo-bg: rgba(167, 139, 250, 0.14);
+    --sv-neutral-bg: rgba(255, 255, 255, 0.05);
+    --sv-row-hover: rgba(255, 255, 255, 0.025);
+    --sv-row-selected: rgba(240, 192, 48, 0.06);
+}
+
+/* ---------- Barra acima da tabela ---------- */
+.admin-stockv__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin: 18px 0 12px;
+}
+
+.admin-stockv__toolbar-hint {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-stockv__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0 0 0 auto;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.admin-stockv__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-stockv__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.admin-stockv__dot--success { background: #0f9d58; }
+.admin-stockv__dot--warn { background: #e8890b; }
+.admin-stockv__dot--danger { background: #dc2626; }
+
+/* ---------- Grade ---------- */
+.admin-stockv > .admin-stockv__head,
+.admin-stockv .admin-stockv__row {
+    display: grid;
+    grid-template-columns: var(--sv-cols);
+    column-gap: 16px;
+    align-items: center;
+}
+
+.admin-stockv > .admin-stockv__head {
+    padding: 11px 18px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-stockv__head .admin-table__sort-toggle {
+    color: inherit;
+}
+
+.admin-stockv__cell {
+    min-width: 0;
+}
+
+.admin-stockv__cell--num {
+    text-align: right;
+    justify-content: flex-end;
+}
+
+.admin-stockv__cell--center {
+    text-align: center;
+    justify-content: center;
+}
+
+.admin-stockv__head .admin-stockv__cell--num,
+.admin-stockv__head .admin-stockv__cell--center {
+    display: flex;
+}
+
+.admin-stockv__cell--check {
+    display: flex;
+    align-items: center;
+}
+
+.admin-stockv__checkbox {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    accent-color: var(--color-primary);
+    cursor: pointer;
+}
+
+/* ---------- Linha ---------- */
+.admin-stockv .admin-stockv__row {
+    position: relative;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--color-border);
+    transition: background var(--transition, 160ms);
+}
+
+.admin-stockv .admin-stockv__row:last-child {
+    border-bottom: none;
+}
+
+.admin-stockv .admin-stockv__row:hover {
+    background: var(--sv-row-hover);
+}
+
+.admin-stockv .admin-stockv__row:has([data-bulk-select]:checked) {
+    background: var(--sv-row-selected);
+}
+
+/* Faixa da situação à esquerda (só quando pede atenção) */
+.admin-stockv .admin-stockv__row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--sv-accent, transparent);
+}
+
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--danger) { --sv-accent: var(--sv-danger); --sv-qty: var(--sv-danger); }
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--warn) { --sv-accent: var(--sv-warn); --sv-qty: var(--sv-warn); }
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--neutral) .admin-stockv__name,
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--neutral) .admin-stockv__qty {
+    color: var(--color-text-muted);
+}
+
+/* Produto */
+.admin-stockv__product {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-stockv__thumb-wrap {
+    position: relative;
+    flex-shrink: 0;
+    width: 46px;
+    height: 46px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: #fff;
+    overflow: hidden;
+}
+
+/* Sem foto (ou foto quebrada): ícone por trás da imagem */
+.admin-stockv__thumb-wrap::before {
+    content: "\f03e";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 400;
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 16px;
+    color: #c5cad6;
+}
+
+html.admin-theme--dark .admin-stockv__thumb-wrap {
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.admin-stockv .admin-stockv__thumb {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 3px;
+    border: none;
+    border-radius: 0;
+    object-fit: contain;
+    background: #fff;
+}
+
+.admin-stockv__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.admin-stockv__name {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-weight: 600;
+    font-size: 13.5px;
+    line-height: 1.35;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.admin-stockv__name:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.admin-stockv__variant,
+.admin-stockv__subtitle {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-stockv__variant {
+    font-weight: 600;
+    color: var(--color-text);
+    opacity: 0.8;
+}
+
+.admin-stockv__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    margin-top: 2px;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-stockv__meta-sep {
+    opacity: 0.6;
+}
+
+.admin-stockv__code {
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: var(--sv-neutral-bg);
+    color: var(--color-text);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+}
+
+.admin-stockv__delivery {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 4px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--sv-warn-bg);
+    color: var(--sv-warn);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.admin-stockv__delivery[hidden] {
+    display: none;
+}
+
+.admin-stockv__delivery i {
+    font-size: 10px;
+}
+
+/* Preço */
+.admin-stockv__price {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 3px;
+}
+
+.admin-stockv__price-value {
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-stockv__price-flag {
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: var(--sv-neutral-bg);
+    color: var(--color-text-muted);
+    font-size: 10.5px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.admin-stockv__price-flag[hidden] {
+    display: none;
+}
+
+/* Vendas, estoque, mínimo */
+.admin-stockv__sales,
+.admin-stockv__min {
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-stockv__qty {
+    display: inline-grid;
+    place-items: center;
+    min-width: 40px;
+    height: 28px;
+    padding: 0 9px;
+    border-radius: 8px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    font-variant-numeric: tabular-nums;
+    color: var(--sv-qty, var(--color-text));
+}
+
+.admin-stockv__qty strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: inherit;
+}
+
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--danger) .admin-stockv__qty {
+    border-color: transparent;
+    background: var(--sv-danger-bg);
+}
+
+.admin-stockv__row:has([data-stock-status-badge].admin-badge--warn) .admin-stockv__qty {
+    border-color: transparent;
+    background: var(--sv-warn-bg);
+}
+
+/* Situação */
+.admin-stockv__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+
+.admin-stockv .admin-stockv__status [data-stock-status-badge] {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+/* Ícone pelo tipo: o atualizador ao vivo só troca classe e texto */
+.admin-stockv .admin-stockv__status [data-stock-status-badge]::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 10.5px;
+}
+
+.admin-stockv .admin-stockv__status .admin-badge--success::before { content: "\f00c"; }
+.admin-stockv .admin-stockv__status .admin-badge--warn::before { content: "\f071"; }
+.admin-stockv .admin-stockv__status .admin-badge--danger::before { content: "\f05e"; }
+.admin-stockv .admin-stockv__status .admin-badge--neutral::before { content: "\f070"; }
+
+.admin-stockv .admin-stockv__status .admin-badge--success { background: var(--sv-success-bg); color: var(--sv-success); }
+.admin-stockv .admin-stockv__status .admin-badge--warn { background: var(--sv-warn-bg); color: var(--sv-warn); }
+.admin-stockv .admin-stockv__status .admin-badge--danger { background: var(--sv-danger-bg); color: var(--sv-danger); }
+
+.admin-stockv__promo {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--sv-promo-bg);
+    color: var(--sv-promo);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: help;
+}
+
+.admin-stockv__promo[hidden] {
+    display: none;
+}
+
+.admin-stockv__promo i {
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.admin-stockv__promo > span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Ações */
+.admin-stockv__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.admin-stockv__icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 13px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: border-color var(--transition, 160ms), color var(--transition, 160ms),
+                background var(--transition, 160ms);
+}
+
+.admin-stockv__icon-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.admin-stockv__icon-btn--danger {
+    color: var(--sv-danger);
+}
+
+.admin-stockv__icon-btn--danger:hover {
+    border-color: var(--sv-danger);
+    color: var(--sv-danger);
+    background: var(--sv-danger-bg);
+}
+
+/* Vazio */
+.admin-stockv__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 44px 18px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.admin-stockv__empty > i {
+    font-size: 28px;
+    opacity: 0.5;
+    margin-bottom: 6px;
+}
+
+.admin-stockv__empty p {
+    margin: 0;
+}
+
+.admin-stockv__empty-title {
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.admin-stockv__empty-hint {
+    font-size: 13px;
+}
+
+/* ---------- Telas médias: some a coluna Mínimo ---------- */
+@media (max-width: 1180px) {
+    .admin-stockv {
+        --sv-cols: 30px minmax(220px, 3fr) minmax(104px, 0.9fr) 64px 80px minmax(160px, 1.4fr) 80px;
+    }
+
+    .admin-stockv__head > :nth-child(6),
+    .admin-stockv .admin-stockv__min {
+        display: none;
+    }
+}
+
+/* ---------- Celular e tablet estreito: cada produto vira um cartão ---------- */
+@media (max-width: 900px) {
+    .admin-stockv__legend {
+        margin-left: 0;
+    }
+
+    .admin-stockv {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .admin-stockv > .admin-stockv__head {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        border: 1px solid var(--color-border);
+        border-radius: 12px;
+    }
+
+    /* No cartão, do cabeçalho só fica o "selecionar todos" */
+    .admin-stockv > .admin-stockv__head > :not(.admin-stockv__cell--check) {
+        display: none;
+    }
+
+    .admin-stockv > .admin-stockv__head > .admin-stockv__cell--check::after {
+        content: "Selecionar todos desta página";
+        margin-left: 10px;
+        font-size: 11px;
+    }
+
+    .admin-stockv .admin-stockv__row {
+        /* Preço mais largo: "R$ 2.460,00" + "preço do evento" cabem sem transbordar */
+        grid-template-columns: 22px minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
+        grid-template-areas:
+            "check product product product actions"
+            ".     price   sales   qty     min"
+            ".     status  status  status  status";
+        gap: 10px 8px;
+        margin-bottom: 10px;
+        padding: 14px 14px 14px 12px;
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+        align-items: start;
+    }
+
+    .admin-stockv .admin-stockv__row:last-child {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .admin-stockv .admin-stockv__row::before {
+        top: 14px;
+        bottom: 14px;
+    }
+
+    .admin-stockv .admin-stockv__row > .admin-stockv__cell--check { grid-area: check; padding-top: 14px; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__product { grid-area: product; align-items: flex-start; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__actions { grid-area: actions; flex-direction: column; align-items: flex-end; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__price { grid-area: price; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__sales { grid-area: sales; }
+    .admin-stockv .admin-stockv__row > [data-label="Estoque"] { grid-area: qty; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__min { grid-area: min; display: block; }
+    .admin-stockv .admin-stockv__row > .admin-stockv__status { grid-area: status; }
+
+    /* Números em caixinhas com rótulo */
+    .admin-stockv .admin-stockv__row > [data-label] {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        padding: 7px 9px;
+        border-radius: 10px;
+        background: var(--sv-neutral-bg);
+        text-align: left;
+        color: var(--color-text);
+        font-weight: 600;
+    }
+
+    .admin-stockv .admin-stockv__row > [data-label]::before {
+        content: attr(data-label);
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+    }
+
+    .admin-stockv .admin-stockv__row > [data-label] .admin-stockv__qty {
+        min-width: 0;
+        height: auto;
+        padding: 0;
+        border: none;
+        background: none;
+    }
+
+    .admin-stockv .admin-stockv__row > .admin-stockv__price .admin-stockv__price-value {
+        font-size: 12.5px;
+    }
+
+    .admin-stockv__row:has([data-stock-status-badge].admin-badge--danger) > [data-label="Estoque"] {
+        background: var(--sv-danger-bg);
+    }
+
+    .admin-stockv__row:has([data-stock-status-badge].admin-badge--warn) > [data-label="Estoque"] {
+        background: var(--sv-warn-bg);
+    }
+
+    .admin-stockv__thumb-wrap {
+        width: 42px;
+        height: 42px;
+    }
+}
+
+/* ==========================================================================
+   Biblioteca de produtos — templates/admin/products.html (.admin-stockv--library)
+   Mesma grade do estoque do evento, sem Mínimo/Situação:
+   seleção, produto, preço, vendas (todos os eventos), estoque, ações.
+   ========================================================================== */
+.admin-stockv.admin-stockv--library {
+    --sv-cols: 30px minmax(280px, 3fr) minmax(104px, 0.9fr) 84px 92px 84px;
+}
+
+.admin-stockv--library .admin-stockv__sales {
+    cursor: help;
+}
+
+@media (max-width: 1180px) {
+    .admin-stockv.admin-stockv--library {
+        --sv-cols: 30px minmax(220px, 3fr) minmax(96px, 0.9fr) 70px 80px 80px;
+    }
+}
+
+@media (max-width: 900px) {
+    .admin-stockv.admin-stockv--library .admin-stockv__row {
+        grid-template-columns: 22px repeat(3, minmax(0, 1fr)) auto;
+        grid-template-areas:
+            "check product product product actions"
+            ".     price   sales   qty     actions";
+    }
+}
+
+/* ==========================================================================
+   Painel do vendedor — templates/seller/stock.html (.admin-stockv--seller)
+   Somente leitura, sem seleção nem preço: produto, vendas (do vendedor),
+   estoque, mínimo, situação e o atalho para as vendas do produto.
+   ========================================================================== */
+.admin-stockv.admin-stockv--seller {
+    --sv-cols: minmax(260px, 3fr) 84px 92px 84px minmax(190px, 1.5fr) 48px;
+}
+
+/* Só em telas médias: abaixo de 901px vale o cartão, onde o Mínimo é caixinha com rótulo */
+@media (max-width: 1180px) and (min-width: 901px) {
+    .admin-stockv.admin-stockv--seller {
+        --sv-cols: minmax(220px, 3fr) 70px 80px 70px minmax(160px, 1.4fr) 44px;
+    }
+
+    /* A regra geral some com a 6ª coluna (o Mínimo do admin); aqui ela é a
+       de Ações, e com menos colunas o Mínimo continua cabendo. */
+    .admin-stockv--seller .admin-stockv__head > :nth-child(6),
+    .admin-stockv.admin-stockv--seller .admin-stockv__min {
+        display: block;
+    }
+}
+
+@media (max-width: 900px) {
+    /* Sem "selecionar todos", o cabeçalho não tem o que mostrar no cartão */
+    .admin-stockv.admin-stockv--seller > .admin-stockv__head {
+        display: none;
+    }
+
+    .admin-stockv.admin-stockv--seller .admin-stockv__row {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+        grid-template-areas:
+            "product product product actions"
+            "sales   qty     min     min"
+            "status  status  status  status";
+    }
+}

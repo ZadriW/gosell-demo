@@ -1,0 +1,72 @@
+{# Integração ERP — situação do gateway, do envio e da fila. Renderizado também por admin_erp_live (painel ao vivo, static/js/admin-erp-live.js). #}
+<div class="erp-status-grid">
+    <article class="admin-card erp-status">
+        <h2 class="erp-status__title"><i class="fa-solid fa-key" aria-hidden="true"></i> Acesso ao gateway</h2>
+        {% if api_missing %}
+        <p class="erp-status__state erp-status__state--bad">Não configurado</p>
+        <p class="erp-status__hint">Preencha no arquivo <code>.env</code>: {{ api_missing|join(', ') }}.</p>
+        {% elif api_url_problems %}
+        <p class="erp-status__state erp-status__state--bad">Endereço inválido</p>
+        <p class="erp-status__hint"><code>{{ api_base_url }}</code></p>
+        <ul class="erp-status__list">
+            {% for problem in api_url_problems %}<li>{{ problem }}</li>{% endfor %}
+        </ul>
+        <p class="erp-status__hint">Corrija o <code>.env</code> e reinicie o sistema.</p>
+        {% else %}
+        <p class="erp-status__state erp-status__state--ok">Configurado</p>
+        <p class="erp-status__hint"><code>{{ api_base_url }}</code> (ERP simulado da demonstração)</p>
+        {% endif %}
+        <p class="erp-status__hint">
+            Busca de produto avulso por CODPROD:
+            {% if product_filter_param %}ligada (<code>{{ product_filter_param }}</code>){% else %}desligada{% endif %}.
+        </p>
+        <p class="erp-status__hint">
+            Cadastro do cliente no checkout (CPF):
+            {% if client_filter_param %}ERP, depois Go Sell (<code>{{ client_filter_param }}</code>){% else %}só Go Sell{% endif %}.
+        </p>
+        <form method="post" action="{{ url_for('admin_erp_test_connection') }}" data-erp-action>
+            {% include 'partials/csrf_field.html' %}
+            <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm"
+                    {% if api_missing %}disabled{% endif %}
+                    title="Faz um login no ERP e mostra o resultado">
+                <i class="fa-solid fa-plug-circle-check" aria-hidden="true"></i> Testar conexão
+            </button>
+        </form>
+    </article>
+
+    <article class="admin-card erp-status">
+        <h2 class="erp-status__title"><i class="fa-solid fa-paper-plane" aria-hidden="true"></i> Envio de pedidos</h2>
+        {% if readiness or api_missing %}
+        <p class="erp-status__state erp-status__state--warn">Parado</p>
+        <p class="erp-status__hint">As vendas entram na fila, mas só saem quando estiver completo:</p>
+        <ul class="erp-status__list">
+            {% if api_missing %}<li>Acesso ao gateway (.env)</li>{% endif %}
+            {% for item in readiness %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+        {% elif queue_pause %}
+        <p class="erp-status__state erp-status__state--bad">Pausado até {{ queue_pause.until.strftime('%H:%M') }}</p>
+        <p class="erp-status__hint">{{ queue_pause.reason }}</p>
+        <p class="erp-status__hint">Corrija e use <strong>Testar conexão</strong> ou <strong>Enviar agora</strong> para retomar antes disso.</p>
+        {% else %}
+        <p class="erp-status__state erp-status__state--ok">
+            Ativo{% if counts.processando %} <span class="erp-live-pill"><i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> enviando {{ counts.processando }}</span>{% endif %}
+        </p>
+        <p class="erp-status__hint">A fila é verificada a cada 30 segundos e logo após cada venda.</p>
+        {% endif %}
+    </article>
+
+    <article class="admin-card erp-status">
+        <h2 class="erp-status__title"><i class="fa-solid fa-list-check" aria-hidden="true"></i> Fila</h2>
+        <dl class="erp-counts">
+            <div><dt>Aguardando</dt><dd>{{ counts.pendente + counts.processando }}</dd></div>
+            <div><dt>Com erro</dt><dd class="{% if counts.erro %}erp-counts--bad{% endif %}">{{ counts.erro }}</dd></div>
+            <div><dt>Enviados</dt><dd>{{ counts.enviado }}</dd></div>
+        </dl>
+        <form method="post" action="{{ url_for('admin_erp_process_now') }}" data-erp-action>
+            {% include 'partials/csrf_field.html' %}
+            <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">
+                <i class="fa-solid fa-play" aria-hidden="true"></i> Enviar agora
+            </button>
+        </form>
+    </article>
+</div>

@@ -1,0 +1,472 @@
+/* Tabela de movimentações de estoque (.admin-table.admin-movv)
+   - Histórico do produto no evento (event_stock_product.html)
+   - Histórico do produto na biblioteca, com coluna Evento (.admin-movv--events)
+   - Movimentações do evento, com coluna Produto (.admin-movv--products, movements.html)
+   - Vendas do vendedor no produto (.admin-movv--seller, seller/stock_product.html)
+
+   O admin-stock-live.js insere linhas novas ao vivo (renderProductMovementRow) com
+   as mesmas classes .admin-mov__*; por isso tudo aqui é só CSS sobre essas classes.
+   Carregar depois do admin.css: nas regras de celular, os seletores empatam em
+   especificidade com os do admin.css e vencem pela ordem. */
+
+.admin-table.admin-movv {
+    --mv-success: #0c8a4d;
+    --mv-success-bg: rgba(15, 157, 88, 0.11);
+    --mv-warn: #a5620a;
+    --mv-warn-bg: rgba(232, 137, 11, 0.13);
+    --mv-danger: #b91c1c;
+    --mv-danger-bg: rgba(220, 38, 38, 0.09);
+    --mv-neutral-bg: var(--color-bg);
+    --mv-row-hover: rgba(14, 116, 144, 0.025);
+    --mv-cols: minmax(128px, 0.95fr) minmax(118px, 0.85fr) 76px 76px minmax(200px, 2.2fr) minmax(110px, 0.9fr);
+
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+html.admin-theme--dark .admin-table.admin-movv {
+    --mv-success: var(--admin-success);
+    --mv-success-bg: var(--admin-success-bg);
+    --mv-warn: var(--admin-warn);
+    --mv-warn-bg: var(--admin-warn-bg);
+    --mv-danger: var(--admin-danger);
+    --mv-danger-bg: var(--admin-danger-bg);
+    --mv-neutral-bg: rgba(255, 255, 255, 0.05);
+    --mv-row-hover: rgba(255, 255, 255, 0.025);
+}
+
+.admin-table.admin-movv--events {
+    --mv-cols: minmax(124px, 0.9fr) minmax(112px, 0.8fr) minmax(120px, 1fr) 70px 76px minmax(180px, 1.9fr) minmax(104px, 0.85fr);
+}
+
+.admin-table.admin-movv--products {
+    --mv-cols: minmax(118px, 0.8fr) minmax(220px, 2.3fr) minmax(108px, 0.75fr) 66px 70px minmax(170px, 1.7fr) minmax(100px, 0.8fr);
+}
+
+/* ---------- Grade ---------- */
+.admin-table.admin-movv .admin-mov__row {
+    grid-template-columns: var(--mv-cols);
+    min-width: 0;
+    column-gap: 14px;
+    padding: 12px 18px;
+    font-size: 13.5px;
+}
+
+.admin-table.admin-movv > .admin-table__head {
+    padding: 11px 18px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-table.admin-movv .admin-mov__wrapper {
+    position: relative;
+    border-bottom: 1px solid var(--color-border);
+    transition: background var(--transition, 160ms);
+}
+
+.admin-table.admin-movv .admin-mov__wrapper:last-child {
+    border-bottom: none;
+}
+
+.admin-table.admin-movv .admin-mov__wrapper .admin-mov__row {
+    border-bottom: none;
+}
+
+.admin-table.admin-movv .admin-mov__wrapper:hover {
+    background: var(--mv-row-hover);
+}
+
+/* Faixa à esquerda pelo tipo da movimentação */
+.admin-table.admin-movv .admin-mov__wrapper::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--mv-accent, transparent);
+}
+
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--entrada) { --mv-accent: var(--mv-success); }
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--inicial) { --mv-accent: var(--mv-success); }
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--venda) { --mv-accent: var(--color-primary); }
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--saida) { --mv-accent: var(--mv-danger); }
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--pendente) { --mv-accent: var(--mv-warn); }
+.admin-table.admin-movv .admin-mov__wrapper:has(.admin-mov__badge--ajuste) { --mv-accent: var(--color-text-muted); }
+
+/* ---------- Células ---------- */
+/* Data */
+.admin-table.admin-movv .admin-mov__row > :first-child {
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-table.admin-movv > .admin-table__head > :first-child {
+    color: inherit;
+}
+
+/* Produto (só em .admin-movv--products) */
+.admin-table.admin-movv .admin-mov__product {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.admin-table.admin-movv .admin-mov__product > a,
+.admin-table.admin-movv .admin-mov__product > span {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.admin-table.admin-movv .admin-mov__product > a:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.admin-table.admin-movv .admin-mov__product small {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-table.admin-movv .admin-mov__product .admin-mov__sku {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: var(--mv-neutral-bg);
+    color: var(--color-text);
+    font-size: 11px;
+}
+
+/* Tipo: selo com ícone, sem caixa alta */
+.admin-table.admin-movv .admin-mov__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 4px 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+}
+
+.admin-table.admin-movv .admin-mov__badge::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 10px;
+}
+
+.admin-table.admin-movv .admin-mov__badge--entrada::before { content: "\f063"; }
+.admin-table.admin-movv .admin-mov__badge--inicial::before { content: "\f024"; }
+.admin-table.admin-movv .admin-mov__badge--venda::before { content: "\f07a"; }
+.admin-table.admin-movv .admin-mov__badge--saida::before { content: "\f062"; }
+.admin-table.admin-movv .admin-mov__badge--pendente::before { content: "\f466"; }
+.admin-table.admin-movv .admin-mov__badge--ajuste::before { content: "\f1de"; }
+
+.admin-table.admin-movv .admin-mov__badge--saida { background: var(--mv-danger-bg); color: var(--mv-danger); }
+
+/* Evento (só em .admin-movv--events) */
+.admin-table.admin-movv .admin-mov__event-cell {
+    justify-content: flex-start;
+}
+
+/* Delta e saldo */
+.admin-table.admin-movv .admin-mov__delta {
+    font-size: 14px;
+    font-weight: 800;
+}
+
+.admin-table.admin-movv .admin-mov__delta--negative { color: var(--mv-danger); }
+.admin-table.admin-movv .admin-mov__delta--positive { color: var(--mv-success); }
+
+.admin-table.admin-movv .admin-mov__row > .admin-table__col--num strong {
+    display: inline-grid;
+    place-items: center;
+    min-width: 34px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: var(--mv-neutral-bg);
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Motivo / referência */
+.admin-table.admin-movv .admin-mov__reason {
+    color: var(--color-text);
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.admin-table.admin-movv .admin-mov__reason code {
+    margin-right: 4px;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--mv-neutral-bg);
+    color: var(--color-text);
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+.admin-table.admin-movv .admin-mov__order-link {
+    text-decoration: none;
+}
+
+.admin-table.admin-movv .admin-mov__order-link code {
+    background: rgba(14, 116, 144, 0.08);
+    color: var(--color-primary);
+}
+
+html.admin-theme--dark .admin-table.admin-movv .admin-mov__order-link code {
+    background: var(--admin-tint, rgba(240, 192, 48, 0.12));
+}
+
+.admin-table.admin-movv .admin-mov__order-link:hover code {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* Usuário */
+.admin-table.admin-movv .admin-mov__user-cell {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-table.admin-movv .admin-empty {
+    padding: 40px 18px;
+}
+
+/* ---------- Telas médias ---------- */
+@media (max-width: 1100px) {
+    .admin-table.admin-movv {
+        --mv-cols: minmax(118px, 0.9fr) minmax(110px, 0.8fr) 66px 66px minmax(160px, 2fr) minmax(96px, 0.8fr);
+    }
+
+    .admin-table.admin-movv--events {
+        --mv-cols: minmax(112px, 0.9fr) minmax(104px, 0.8fr) minmax(104px, 0.9fr) 60px 66px minmax(140px, 1.6fr);
+    }
+
+    .admin-table.admin-movv--products {
+        --mv-cols: minmax(132px, 0.8fr) minmax(180px, 2.1fr) minmax(100px, 0.75fr) 56px 64px minmax(140px, 1.5fr);
+    }
+
+    /* Coluna Usuário (a 7ª) sai da linha nas tabelas com evento ou produto */
+    .admin-table.admin-movv--events .admin-mov__row > :nth-child(7),
+    .admin-table.admin-movv--products .admin-mov__row > :nth-child(7) {
+        display: none;
+    }
+}
+
+/* ---------- Celular: cada movimentação vira um cartão ----------
+   Os seletores aqui empatam com as regras de celular do admin.css
+   (.admin-mov__wrapper .admin-mov__row:not(--wide) > :nth-child(n), as de
+   --wide e as de .admin-product__movements-table), que punham rótulos e
+   caixinhas em cada célula; vencem por virem depois. */
+@media (max-width: 760px) {
+    .admin-table.admin-movv {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .admin-table.admin-movv > .admin-table__head {
+        display: none;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper {
+        margin-bottom: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper:last-child {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row,
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row.admin-mov__row--with-event,
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row.admin-mov__row--wide {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+            "type   delta"
+            "date   balance"
+            "reason reason"
+            "user   user";
+        gap: 6px 12px;
+        padding: 12px 14px 12px 16px;
+        min-width: 0;
+        align-items: center;
+        font-size: 13px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row.admin-mov__row--with-event {
+        grid-template-areas:
+            "type   delta"
+            "date   balance"
+            "event  event"
+            "reason reason"
+            "user   user";
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row.admin-mov__row--wide {
+        grid-template-areas:
+            "product product"
+            "type    delta"
+            "date    balance"
+            "reason  reason"
+            "user    user";
+    }
+
+    /* Zera o que vem do admin.css */
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > :nth-child(n) {
+        display: block;
+        justify-self: stretch;
+        align-self: center;
+        padding: 0;
+        border-radius: 0;
+        background: none;
+        text-align: left;
+        min-width: 0;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > :nth-child(n)::before {
+        content: none;
+    }
+
+    /* Áreas */
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > :nth-child(1) {
+        grid-area: date;
+        font-size: 12px;
+        color: var(--color-text-muted);
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__product {
+        grid-area: product;
+        display: flex;
+        padding-bottom: 2px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__type-cell {
+        grid-area: type;
+        display: flex;
+        justify-self: start;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__event-cell {
+        grid-area: event;
+        display: flex;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__delta {
+        grid-area: delta;
+        justify-self: end;
+        font-size: 16px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-table__col--num:not(.admin-mov__delta) {
+        grid-area: balance;
+        justify-self: end;
+        font-size: 11.5px;
+        color: var(--color-text-muted);
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__reason {
+        grid-area: reason;
+        padding-top: 4px;
+        font-size: 13px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__user-cell {
+        grid-area: user;
+        display: block;
+        font-size: 12px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-table__col--num:not(.admin-mov__delta)::before,
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__user-cell::before {
+        display: inline;
+        margin: 0 6px 0 0;
+        font-size: 11px;
+        font-weight: 500;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--color-text-muted);
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-table__col--num:not(.admin-mov__delta)::before {
+        content: "saldo";
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper .admin-mov__row > .admin-mov__user-cell::before {
+        content: "\f007";
+        font-family: "Font Awesome 6 Free";
+        font-weight: 900;
+        font-size: 10px;
+    }
+
+    .admin-table.admin-movv .admin-mov__wrapper::before {
+        top: 12px;
+        bottom: 12px;
+    }
+}
+
+/* ==========================================================================
+   Painel do vendedor — templates/seller/stock_product.html (.admin-movv--seller)
+   Só as vendas do próprio vendedor: sem a coluna Usuário. Fora de um evento,
+   ganha a coluna Evento no fim (.admin-movv--seller-events).
+   ========================================================================== */
+.admin-table.admin-movv.admin-movv--seller {
+    --mv-cols: minmax(128px, 0.95fr) minmax(118px, 0.85fr) 96px 86px minmax(220px, 2.6fr);
+}
+
+.admin-table.admin-movv.admin-movv--seller-events {
+    --mv-cols: minmax(124px, 0.9fr) minmax(112px, 0.8fr) 92px 80px minmax(180px, 2fr) minmax(120px, 1fr);
+}
+
+@media (max-width: 760px) {
+    .admin-table.admin-movv--seller .admin-mov__wrapper .admin-mov__row {
+        grid-template-areas:
+            "type   delta"
+            "date   balance"
+            "reason reason";
+    }
+
+    .admin-table.admin-movv--seller-events .admin-mov__wrapper .admin-mov__row {
+        grid-template-areas:
+            "type   delta"
+            "date   balance"
+            "event  event"
+            "reason reason";
+    }
+}

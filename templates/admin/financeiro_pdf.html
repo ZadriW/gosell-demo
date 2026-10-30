@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório Financeiro — {{ report.event.name }} | Go Sell</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/financeiro-pdf.css') }}">
+</head>
+<body>
+
+{% set k = report.kpis %}
+{% set goals = report.goals or {} %}
+{% set stock = report.stock_summary %}
+{% set health = report.stock_health %}
+{# Cor fixa por forma de pagamento (segue a forma, não a posição no ranking). #}
+{% set pm_slot = {'credito': 1, 'debito': 2, 'pix': 3, 'pix_inter': 4, 'dinheiro': 5, 'faturado': 6, 'cartao': 7} %}
+{% set ns = namespace(section=0) %}
+
+{# Botões — só na tela #}
+<div class="finrep-actions">
+    <a class="finrep-btn"
+       href="{{ url_for('admin_financeiro', evento=selected_event_id, de=date_from, ate=date_to) }}">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+        Voltar
+    </a>
+    <button class="finrep-btn finrep-btn--primary" type="button" onclick="window.print()">
+        <i class="fa-solid fa-print" aria-hidden="true"></i>
+        Imprimir / Salvar PDF
+    </button>
+</div>
+
+<article class="finrep">
+
+    {# ── Cabeçalho ───────────────────────────────────────────────────────── #}
+    <header class="finrep__header">
+        <img class="finrep__logo" src="{{ url_for('static', filename='images/logo-gosell.svg') }}" alt="Go Sell">
+        <div class="finrep__heading">
+            <p class="finrep__eyebrow">Relatório financeiro</p>
+            <h1 class="finrep__event">{{ report.event.name }}</h1>
+            <p class="finrep__meta">
+                <span class="finrep__chip">
+                    <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                    {{ report.period.label }}
+                </span>
+                {% if now %}<span>Gerado em {{ now.strftime('%d/%m/%Y às %H:%M') }}</span>{% endif %}
+            </p>
+        </div>
+    </header>
+    <div class="finrep__rule" aria-hidden="true"></div>
+
+    {# ── 01 Resumo ──────────────────────────────────────────────────────── #}
+    {% set ns.section = ns.section + 1 %}
+    <section class="finrep__section finrep__section--keep" style="margin-top:0">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Resumo do período</h2>
+            <span class="finrep__section-note">Somente pedidos confirmados; estornos à parte</span>
+        </div>
+
+        <div class="finrep__summary">
+            <div class="finrep__hero">
+                <div>
+                    <p class="finrep__hero-label">Receita bruta</p>
+                    <p class="finrep__hero-value">{{ k.revenue | brl }}</p>
+                    <p class="finrep__hero-sub">
+                        {{ k.orders | milhar }} pedido{{ 's' if k.orders != 1 }} confirmado{{ 's' if k.orders != 1 }}
+                        · {{ k.items_sold | milhar }} unidade{{ 's' if k.items_sold != 1 }}
+                    </p>
+                </div>
+                {% if goals.revenue %}
+                <div class="finrep__goal">
+                    <div class="finrep__goal-top">
+                        <span>Meta de faturamento · {{ goals.revenue.goal | brl }}</span>
+                        <span class="finrep__goal-pct">{{ goals.revenue.percent | pct }}%</span>
+                    </div>
+                    <div class="finrep__goal-track">
+                        <span class="finrep__goal-fill" style="width:{{ [goals.revenue.bar_percent, 100] | min }}%"></span>
+                    </div>
+                    <div class="finrep__goal-foot">
+                        {% if goals.revenue.reached %}
+                        <i class="fa-solid fa-circle-check" aria-hidden="true"></i> Meta atingida
+                        {% else %}
+                        Faltam {{ goals.revenue.remaining | brl }} para a meta
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="finrep__tiles">
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Pedidos</p>
+                    <p class="finrep__tile-value">{{ k.orders | milhar }}</p>
+                    <p class="finrep__tile-hint">confirmados no período</p>
+                </div>
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Ticket médio</p>
+                    <p class="finrep__tile-value">{{ k.avg_ticket | brl }}</p>
+                    <p class="finrep__tile-hint">receita ÷ pedidos</p>
+                </div>
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Unidades vendidas</p>
+                    <p class="finrep__tile-value">{{ k.items_sold | milhar }}</p>
+                    {% if goals.volume %}
+                    <p class="finrep__tile-hint">{{ goals.volume.percent | pct }}% da meta de {{ goals.volume.goal | milhar }} un.</p>
+                    <div class="finrep__mini-track"><span class="finrep__mini-fill" style="width:{{ [goals.volume.bar_percent, 100] | min }}%"></span></div>
+                    {% else %}
+                    <p class="finrep__tile-hint">
+                        {% if k.orders %}{{ ((k.items_sold / k.orders) | round(1) | string).replace('.', ',') }} por pedido{% else %}—{% endif %}
+                    </p>
+                    {% endif %}
+                </div>
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Estornos</p>
+                    <p class="finrep__tile-value">{{ k.refunds_count | milhar }}</p>
+                    <p class="finrep__tile-hint{% if k.refunds_count %} finrep__tile-hint--alert{% endif %}">
+                        {% if k.refunds_count %}{{ k.refunds_value | brl }} devolvidos{% else %}Nenhum estorno{% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {# ── 02 Vendas ao longo do evento ──────────────────────────────────── #}
+    {% set ns.section = ns.section + 1 %}
+    <section class="finrep__section">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Vendas ao longo do evento</h2>
+            <span class="finrep__section-note">Dias sem pedido aparecem com receita zero</span>
+        </div>
+
+        {% if report.chart_by_day %}
+        {% set day_total = (report.chart_by_day | sum(attribute='revenue')) or 1 %}
+        {% set day_max = (report.chart_by_day | map(attribute='revenue') | max) or 1 %}
+        {% set best_day = (report.chart_by_day | sort(attribute='revenue', reverse=true)) | first %}
+        {% if best_day.revenue > 0 and report.chart_by_day | length > 1 %}
+        <p class="finrep__insight">
+            Melhor dia: <strong>{{ best_day.day | dia_semana }}, {{ best_day.label }}</strong>,
+            com <strong>{{ best_day.revenue | brl }}</strong>
+            ({{ (best_day.revenue / day_total * 100) | pct }}% da receita do período, em {{ best_day.orders }} pedidos).
+        </p>
+        {% endif %}
+        <table class="finrep__table">
+            <thead>
+                <tr>
+                    <th>Dia</th>
+                    <th>Receita no dia</th>
+                    <th class="num">Pedidos</th>
+                    <th class="num">Unidades</th>
+                    <th class="num">Ticket médio</th>
+                    <th class="num">Receita</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in report.chart_by_day %}
+                {% set parts = d.day.split('-') %}
+                <tr class="{{ 'is-zero' if not d.orders }}">
+                    <td class="finrep__day"><span class="finrep__day-week">{{ d.day | dia_semana }}</span>{{ parts[2] }}/{{ parts[1] }}/{{ parts[0] }}</td>
+                    <td style="width:34%">
+                        <span class="finrep__bar">
+                            <span class="finrep__bar-track"><span class="finrep__bar-fill" style="width:{{ (d.revenue / day_max * 100) | round(1) }}%"></span></span>
+                            <span class="finrep__bar-value">{{ (d.revenue / day_total * 100) | pct }}%</span>
+                        </span>
+                    </td>
+                    <td class="num">{{ d.orders | milhar }}</td>
+                    <td class="num">{{ (d['items'] or 0) | milhar }}</td>
+                    <td class="num">{% if d.orders %}{{ d.avg_ticket | brl }}{% else %}—{% endif %}</td>
+                    <td class="num strong">{{ d.revenue | brl }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td>Total</td>
+                    <td></td>
+                    <td class="num">{{ k.orders | milhar }}</td>
+                    <td class="num">{{ k.items_sold | milhar }}</td>
+                    <td class="num">{{ k.avg_ticket | brl }}</td>
+                    <td class="num">{{ k.revenue | brl }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        {% else %}
+        <p class="finrep__empty">Sem pedidos confirmados no período.</p>
+        {% endif %}
+
+        {# Pedidos por hora: da primeira à última hora com venda, sem buracos. #}
+        {% set active_hours = report.chart_by_hour | selectattr('orders', 'gt', 0) | list %}
+        {% if active_hours %}
+        {% set hours = report.chart_by_hour[active_hours[0].hour : active_hours[-1].hour + 1] %}
+        {% set hour_max = (hours | map(attribute='orders') | max) or 1 %}
+        {% set peak = (active_hours | sort(attribute='orders', reverse=true)) | first %}
+        <div class="finrep__section--keep" style="margin-top:18px">
+            <p class="finrep__subhead">Pedidos por hora</p>
+            <p class="finrep__insight">
+                Horário de pico: <strong>{{ peak.label }}</strong>, com <strong>{{ peak.orders }} pedidos</strong>
+                ({{ peak.revenue | brl }}). Abaixo de cada hora, a receita do horário.
+            </p>
+            <div class="finrep__hours">
+                {% for h in hours %}
+                <div class="finrep__hour{% if h.hour == peak.hour %} finrep__hour--peak{% endif %}{% if not h.orders %} finrep__hour--empty{% endif %}">
+                    <div class="finrep__hour-plot">
+                        <span class="finrep__hour-count">{{ h.orders }}</span>
+                        <span class="finrep__hour-bar" style="height:{{ (h.orders / hour_max * 72) | round(1) }}px"></span>
+                    </div>
+                    <span class="finrep__hour-label">{{ h.label }}</span>
+                    <span class="finrep__hour-money">{{ h.revenue | brl_compacto if h.revenue else '—' }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ── 03 Pagamentos e vendedores ─────────────────────────────────────── #}
+    {% if report.payment_methods or report.sellers %}
+    {% set ns.section = ns.section + 1 %}
+    <section class="finrep__section finrep__section--keep">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Pagamentos e equipe de vendas</h2>
+        </div>
+
+        <div class="finrep__cols">
+            <div>
+                <p class="finrep__subhead">Formas de pagamento</p>
+                {% if report.payment_methods %}
+                {% set pm_total = (report.payment_methods | sum(attribute='revenue')) or 1 %}
+                <div class="finrep__stack" role="img" aria-label="Participação de cada forma de pagamento na receita">
+                    {% for pm in report.payment_methods if pm.revenue > 0 %}
+                    <span class="finrep__stack-seg" style="flex:{{ pm.revenue }} 1 0;background:var(--fr-series-{{ pm_slot.get(pm.method, 8) }})"></span>
+                    {% endfor %}
+                </div>
+                <table class="finrep__legend">
+                    {% for pm in report.payment_methods %}
+                    <tr>
+                        <td>
+                            <span class="finrep__legend-name">
+                                <span class="finrep__swatch" style="background:var(--fr-series-{{ pm_slot.get(pm.method, 8) }})"></span>
+                                <span>
+                                    {{ pm.method | paymethod(None) }}
+                                    <span class="finrep__legend-sub">{{ pm.orders | milhar }} pedido{{ 's' if pm.orders != 1 }}</span>
+                                </span>
+                            </span>
+                        </td>
+                        <td class="num finrep__legend-pct">{{ (pm.revenue / pm_total * 100) | pct }}%</td>
+                        <td class="num" style="width:40%">{{ pm.revenue | brl }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+                {% else %}
+                <p class="finrep__empty">Sem dados de pagamento.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <p class="finrep__subhead">Desempenho por vendedor</p>
+                {% if report.sellers %}
+                {% set seller_total = (report.sellers | sum(attribute='revenue')) or 1 %}
+                {% set seller_max = (report.sellers | map(attribute='revenue') | max) or 1 %}
+                <div class="finrep__sellers">
+                    {% for s in report.sellers %}
+                    <div class="finrep__seller">
+                        <div class="finrep__seller-top">
+                            <span class="finrep__seller-pos">{{ loop.index }}</span>
+                            <span class="finrep__seller-name">{{ s.name }}</span>
+                            <span class="finrep__seller-value">{{ s.revenue | brl }}</span>
+                        </div>
+                        <span class="finrep__bar">
+                            <span class="finrep__bar-track"><span class="finrep__bar-fill" style="width:{{ (s.revenue / seller_max * 100) | round(1) }}%"></span></span>
+                            <span class="finrep__bar-value">{{ (s.revenue / seller_total * 100) | pct }}%</span>
+                        </span>
+                        <p class="finrep__seller-sub">
+                            {{ s.orders | milhar }} pedido{{ 's' if s.orders != 1 }}
+                            {% if s.orders %} · ticket médio {{ (s.revenue / s.orders) | brl }}{% endif %}
+                        </p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="finrep__empty">Sem vendas por vendedor no período.</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+    {% endif %}
+
+    {# ── 04 Receita por marca ───────────────────────────────────────────── #}
+    {% if report.brands %}
+    {% set ns.section = ns.section + 1 %}
+    {% set brand_total = (report.brands | sum(attribute='revenue')) or 1 %}
+    {% set brand_max = (report.brands | map(attribute='revenue') | max) or 1 %}
+    {% set top3 = report.brands[:3] | sum(attribute='revenue') %}
+    {% set bns = namespace(acc=0) %}
+    <section class="finrep__section">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Receita por marca</h2>
+            <span class="finrep__section-note">Marca do cadastro do ERP; sem ela, a do fim do nome do produto</span>
+        </div>
+        {% if report.brands | length > 3 %}
+        <p class="finrep__insight">
+            As <strong>3 marcas líderes</strong> ({{ report.brands[:3] | map(attribute='brand') | join(', ') }})
+            concentram <strong>{{ (top3 / brand_total * 100) | pct }}%</strong> da receita entre {{ report.brands | length }} marcas vendidas.
+        </p>
+        {% endif %}
+        <table class="finrep__table finrep__table--compact">
+            <thead>
+                <tr>
+                    <th class="num">#</th>
+                    <th>Marca</th>
+                    <th>Participação na receita</th>
+                    <th class="num">Acumulado</th>
+                    <th class="num">Unid.</th>
+                    <th class="num">Pedidos</th>
+                    <th class="num">Receita</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in report.brands %}
+                {% set bns.acc = bns.acc + b.revenue %}
+                <tr>
+                    <td class="rank">{{ loop.index }}</td>
+                    <td class="strong">{{ b.brand }}</td>
+                    <td style="width:30%">
+                        <span class="finrep__bar">
+                            <span class="finrep__bar-track"><span class="finrep__bar-fill" style="width:{{ (b.revenue / brand_max * 100) | round(1) }}%"></span></span>
+                            <span class="finrep__bar-value">{{ (b.revenue / brand_total * 100) | pct }}%</span>
+                        </span>
+                    </td>
+                    <td class="num muted">{{ (bns.acc / brand_total * 100) | pct }}%</td>
+                    <td class="num">{{ b.units | milhar }}</td>
+                    <td class="num">{{ b.orders | milhar }}</td>
+                    <td class="num strong">{{ b.revenue | brl }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    {# ── 05 Produtos mais vendidos ──────────────────────────────────────── #}
+    {% if report.top_skus %}
+    {% set ns.section = ns.section + 1 %}
+    <section class="finrep__section">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Produtos mais vendidos</h2>
+            <span class="finrep__section-note">Ordenados por unidades vendidas</span>
+        </div>
+        <table class="finrep__table">
+            <thead>
+                <tr>
+                    <th class="num">#</th>
+                    <th>Produto</th>
+                    <th class="num">Unidades</th>
+                    <th class="num">Receita</th>
+                    <th class="num">Preço médio</th>
+                    <th class="num">Estornos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sku in report.top_skus %}
+                <tr>
+                    <td class="rank">{{ sku.rank }}</td>
+                    <td class="finrep__product">
+                        {{ sku.product_name }}
+                        <span class="finrep__sku">SKU {{ sku.sku }}</span>
+                    </td>
+                    <td class="num strong">{{ sku.units_sold | milhar }}</td>
+                    <td class="num">{{ sku.revenue | brl }}</td>
+                    <td class="num muted">{% if sku.units_sold %}{{ (sku.revenue / sku.units_sold) | brl }}{% else %}—{% endif %}</td>
+                    <td class="num {{ 'alert' if sku.refunded_units > 0 else 'muted' }}">
+                        {{ sku.refunded_units if sku.refunded_units > 0 else '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    {# ── 06 Estoque do evento ───────────────────────────────────────────── #}
+    {% set ns.section = ns.section + 1 %}
+    {% set health_total = (health.ok + health.below_min + health.out_of_stock) or 1 %}
+    <section class="finrep__section finrep__section--keep">
+        <div class="finrep__section-head">
+            <span class="finrep__section-index">{{ '%02d' % ns.section }}</span>
+            <h2 class="finrep__section-title">Estoque do evento</h2>
+            <span class="finrep__section-note">Situação atual, independentemente do período filtrado</span>
+        </div>
+
+        <p class="finrep__subhead">Movimentação de unidades</p>
+        <div class="finrep__flow">
+            <div class="finrep__flow-box">
+                <span class="finrep__flow-label">Entradas</span>
+                <span class="finrep__flow-value finrep__flow-value--in">+{{ stock.entries | milhar }}</span>
+            </div>
+            <span class="finrep__flow-op" aria-hidden="true">−</span>
+            <div class="finrep__flow-box">
+                <span class="finrep__flow-label">Saídas por venda</span>
+                <span class="finrep__flow-value finrep__flow-value--out">{{ stock.sold_units | milhar }}</span>
+            </div>
+            <span class="finrep__flow-op" aria-hidden="true">+</span>
+            <div class="finrep__flow-box">
+                <span class="finrep__flow-label">Devoluções</span>
+                <span class="finrep__flow-value finrep__flow-value--in">{{ stock.refunded_units | milhar }}</span>
+            </div>
+            <span class="finrep__flow-op" aria-hidden="true">−</span>
+            <div class="finrep__flow-box">
+                <span class="finrep__flow-label">Saídas manuais</span>
+                <span class="finrep__flow-value finrep__flow-value--out">{{ stock.exits_manual | milhar }}</span>
+            </div>
+            <span class="finrep__flow-op" aria-hidden="true">=</span>
+            <div class="finrep__flow-box finrep__flow-box--total">
+                <span class="finrep__flow-label">Saldo atual</span>
+                <span class="finrep__flow-value">{{ stock.final_units | milhar }}</span>
+            </div>
+        </div>
+
+        <div class="finrep__stock-grid">
+            <div>
+                <p class="finrep__subhead">Saúde do estoque · {{ stock.products_count | milhar }} produtos</p>
+                <div class="finrep__stack" role="img" aria-label="Produtos por situação de estoque">
+                    {% if health.ok %}<span class="finrep__stack-seg" style="flex:{{ health.ok }} 1 0;background:var(--fr-good)"></span>{% endif %}
+                    {% if health.below_min %}<span class="finrep__stack-seg" style="flex:{{ health.below_min }} 1 0;background:var(--fr-warning)"></span>{% endif %}
+                    {% if health.out_of_stock %}<span class="finrep__stack-seg" style="flex:{{ health.out_of_stock }} 1 0;background:var(--fr-critical)"></span>{% endif %}
+                </div>
+                <table class="finrep__legend">
+                    <tr>
+                        <td><span class="finrep__legend-name"><i class="fa-solid fa-circle-check finrep__status-icon" style="color:var(--fr-good)" aria-hidden="true"></i>Saudável</span></td>
+                        <td class="num finrep__legend-pct">{{ (health.ok / health_total * 100) | pct }}%</td>
+                        <td class="num" style="width:30%">{{ health.ok | milhar }} produtos</td>
+                    </tr>
+                    <tr>
+                        <td><span class="finrep__legend-name"><i class="fa-solid fa-triangle-exclamation finrep__status-icon" style="color:var(--fr-warning)" aria-hidden="true"></i>Abaixo do mínimo</span></td>
+                        <td class="num finrep__legend-pct">{{ (health.below_min / health_total * 100) | pct }}%</td>
+                        <td class="num">{{ health.below_min | milhar }} produtos</td>
+                    </tr>
+                    <tr>
+                        <td><span class="finrep__legend-name"><i class="fa-solid fa-circle-xmark finrep__status-icon" style="color:var(--fr-critical)" aria-hidden="true"></i>Sem estoque</span></td>
+                        <td class="num finrep__legend-pct">{{ (health.out_of_stock / health_total * 100) | pct }}%</td>
+                        <td class="num">{{ health.out_of_stock | milhar }} produtos</td>
+                    </tr>
+                </table>
+            </div>
+            <div class="finrep__stock-stats">
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Valor em estoque</p>
+                    <p class="finrep__tile-value">{{ stock.stock_value | brl }}</p>
+                    <p class="finrep__tile-hint">saldo atual × preço de venda</p>
+                </div>
+                <div class="finrep__tile">
+                    <p class="finrep__tile-label">Produtos no evento</p>
+                    <p class="finrep__tile-value">{{ stock.products_count | milhar }}</p>
+                    <p class="finrep__tile-hint">{{ stock.final_units | milhar }} unidades em estoque</p>
+                </div>
+            </div>
+        </div>
+        <p class="finrep__tile-hint" style="margin-top:10px">
+            As saídas por venda vêm das movimentações do estoque e podem diferir das unidades vendidas do resumo,
+            que contam só os pedidos confirmados no período.
+        </p>
+    </section>
+
+    {# ── Rodapé ─────────────────────────────────────────────────────────── #}
+    <footer class="finrep__footer">
+        <span>Relatório gerado pelo sistema Go Sell</span>
+        <span>
+            {{ report.event.name }} ·
+            {% if report.period.date_from or report.period.date_to %}Período: {{ report.period.label }}{% else %}Todo o período do evento{% endif %}
+        </span>
+    </footer>
+
+</article>
+
+</body>
+</html>

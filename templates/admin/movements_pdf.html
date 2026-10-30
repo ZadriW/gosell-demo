@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movimentações — {{ event.name }} | Go Sell</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        body { margin: 0; background: #fff; }
+        @page { size: A4 landscape; margin: 12mm 18mm; }
+    </style>
+</head>
+<body>
+
+{# Botões de controle — ocultos na impressão #}
+<button class="fin-pdf__print-btn" onclick="window.print()">
+    <i class="fa-solid fa-print" aria-hidden="true"></i>
+    Imprimir / Salvar PDF
+</button>
+
+<a class="fin-pdf__back-btn" href="{{ back_url }}">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    Voltar
+</a>
+
+<div class="fin-pdf">
+
+    {# ── Cabeçalho ─────────────────────────────────────────────────────── #}
+    <header class="fin-pdf__header">
+        <div class="fin-pdf__brand">
+            <img src="{{ url_for('static', filename='images/logo-gosell.svg') }}" alt="Go Sell">
+        </div>
+        <div class="fin-pdf__meta">
+            <div class="fin-pdf__event-name">{{ event.name }}</div>
+            <div class="fin-pdf__period">Movimentações de estoque</div>
+            <div class="fin-pdf__generated">
+                Relatório gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }}
+            </div>
+        </div>
+    </header>
+
+    {# ── Filtros ativos ───────────────────────────────────────────────── #}
+    {% if filters_active %}
+    <div style="margin-bottom:20px;padding:10px 16px;background:#f5f6fb;border-radius:8px;
+                font-size:12px;color:#374151;border:1px solid #e5e7eb">
+        <strong style="color:#0e7490">Filtros aplicados:</strong>
+        {% if filters.tipo != 'todos' %}
+            &nbsp; Tipo: <em>{{ filters.tipo | movlabel }}</em>
+        {% endif %}
+        {% if filters.q %}
+            &nbsp;&bull;&nbsp; Produto: <em>{{ filters.q }}</em>
+        {% endif %}
+        {% if seller_name %}
+            &nbsp;&bull;&nbsp; Vendedor: <em>{{ seller_name }}</em>
+        {% endif %}
+        {% if filters.pedido %}
+            &nbsp;&bull;&nbsp; Pedido: <em>{{ filters.pedido }}</em>
+        {% endif %}
+        {% if filters.de %}
+            &nbsp;&bull;&nbsp; De: <em>{{ filters.de[8:10] }}/{{ filters.de[5:7] }}/{{ filters.de[0:4] }}</em>
+        {% endif %}
+        {% if filters.ate %}
+            &nbsp;&bull;&nbsp; Até: <em>{{ filters.ate[8:10] }}/{{ filters.ate[5:7] }}/{{ filters.ate[0:4] }}</em>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── KPIs ──────────────────────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Resumo</div>
+        <div class="fin-pdf__kpis">
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Total de registros</div>
+                <div class="fin-pdf__kpi-value">{{ summary.total }}</div>
+                <div class="fin-pdf__kpi-hint">Movimentações encontradas</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Vendas</div>
+                <div class="fin-pdf__kpi-value">{{ summary.sales_count }}</div>
+                <div class="fin-pdf__kpi-hint">{{ summary.units_sold }} unid. vendidas</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Entradas</div>
+                <div class="fin-pdf__kpi-value">{{ summary.entries_count }}</div>
+                <div class="fin-pdf__kpi-hint">{{ summary.units_entered }} unid. adicionadas</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Saídas manuais</div>
+                <div class="fin-pdf__kpi-value">{{ summary.exits_count }}</div>
+                <div class="fin-pdf__kpi-hint">{{ summary.units_exited }} unid. removidas</div>
+            </div>
+        </div>
+    </section>
+
+    {# ── Tabela de movimentações ──────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Detalhamento</div>
+
+        {% if capped %}
+        <p style="color:#92400e;font-size:11px;margin:0 0 10px">
+            Mostrando as {{ summary.shown }} movimentações mais recentes de {{ summary.total }} encontradas.
+            Para o conjunto completo, use a exportação em planilha (.xlsx).
+        </p>
+        {% endif %}
+
+        {% if movements %}
+        <table class="fin-pdf__table">
+            <thead>
+                <tr>
+                    <th style="width:108px">Data / Hora</th>
+                    <th>Produto</th>
+                    <th style="width:80px">Tipo</th>
+                    <th class="num" style="width:52px">Delta</th>
+                    <th class="num" style="width:68px">Saldo após</th>
+                    <th style="width:180px">Referência / Motivo</th>
+                    <th style="width:120px">Usuário</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movements %}
+                <tr>
+                    <td style="white-space:nowrap;font-size:11px;color:#6b7280">
+                        {{ m.created_at | datahora }}
+                    </td>
+
+                    <td>
+                        <span style="font-weight:600;font-size:12px">{{ m.product_name or '—' }}</span>
+                        {% if m.product_sku %}
+                        <br>
+                        <span style="font-size:10px;color:#9ca3af;font-family:monospace,monospace">
+                            {{ m.product_sku }}
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td>
+                        <span style="display:inline-block;font-size:10px;font-weight:700;
+                                     padding:2px 7px;border-radius:20px;white-space:nowrap;
+                                     {% if m.movement_type == 'venda' %}
+                                         color:#065f46;background:#d1fae5;
+                                     {% elif m.movement_type in ('entrada', 'inicial') %}
+                                         color:#1e3a8a;background:#dbeafe;
+                                     {% elif m.movement_type == 'saida' %}
+                                         color:#991b1b;background:#fee2e2;
+                                     {% elif m.movement_type == 'ajuste' %}
+                                         color:#78350f;background:#fef3c7;
+                                     {% else %}
+                                         color:#374151;background:#f3f4f6;
+                                     {% endif %}">
+                            {{ m.movement_type | movlabel }}
+                        </span>
+                    </td>
+
+                    <td class="num {% if (m.delta or 0) > 0 %}positive{% else %}negative{% endif %}"
+                        style="font-weight:700;font-size:13px">
+                        {{ m.delta | signed }}
+                    </td>
+
+                    <td class="num" style="font-weight:700;font-size:13px">
+                        {{ m.balance_after }}
+                    </td>
+
+                    <td style="font-size:11px">
+                        {% if m.reference %}
+                        <code style="font-family:monospace,monospace;font-size:10px;
+                                     color:#0e7490;background:#eff1ff;padding:1px 4px;border-radius:3px">
+                            {{ m.reference }}
+                        </code>
+                        {% endif %}
+                        {% if m.reason %}
+                        <span style="color:#6b7280{% if m.reference %};display:block;margin-top:2px{% endif %}">
+                            {{ m.reason }}
+                        </span>
+                        {% endif %}
+                        {% if not m.reference and not m.reason %}—{% endif %}
+                    </td>
+
+                    <td style="font-size:11px;color:#6b7280">
+                        {{ m.created_by | display_created_by or m.seller_name or '—' }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#9ca3af;font-size:12px;padding:20px 0;text-align:center">
+            Nenhuma movimentação encontrada para os filtros aplicados.
+        </p>
+        {% endif %}
+    </section>
+
+    {# ── Rodapé ────────────────────────────────────────────────────────── #}
+    <footer class="fin-pdf__footer">
+        Relatório de movimentações — {{ event.name }}
+        — Gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }} pelo sistema Go Sell
+    </footer>
+
+</div>
+
+{# Font Awesome para ícones dos botões (somente no browser) #}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}" media="screen">
+
+</body>
+</html>

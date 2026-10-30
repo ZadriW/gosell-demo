@@ -1,0 +1,195 @@
+{# Integração ERP — fila de envio (filtro + tabela). Renderizado também por admin_erp_live (painel ao vivo, static/js/admin-erp-live.js). #}
+<header class="admin-section__header admin-section__header--row">
+    <div>
+        <h2 class="admin-section__title">Fila de envio</h2>
+        <p class="admin-section__subtitle">Pedidos e cancelamentos a caminho do ERP.</p>
+    </div>
+    <nav class="erp-filter" aria-label="Filtrar fila">
+        <a href="{{ url_for('admin_erp') }}#fila" data-erp-filter="" class="erp-filter__chip{% if not status_filter %} is-active{% endif %}">Todos</a>
+        {% for key, label in outbox_status_labels.items() %}
+        <a href="{{ url_for('admin_erp', status=key) }}#fila" data-erp-filter="{{ key }}"
+           class="erp-filter__chip erp-filter__chip--{{ key }}{% if status_filter == key %} is-active{% endif %}">
+            {{ label }}<span class="erp-filter__count{% if not counts[key] %} is-zero{% endif %}">{{ counts[key] }}</span>
+        </a>
+        {% endfor %}
+    </nav>
+</header>
+{% set queue_status_icons = {
+    'pendente': 'fa-clock',
+    'processando': 'fa-spinner fa-spin',
+    'enviado': 'fa-circle-check',
+    'erro': 'fa-triangle-exclamation',
+    'descartado': 'fa-ban',
+} %}
+{% set queue_status_badges = {
+    'pendente': 'admin-badge--info',
+    'processando': 'admin-badge--info',
+    'enviado': 'admin-badge--success',
+    'erro': 'admin-badge--danger',
+    'descartado': 'admin-badge--neutral',
+} %}
+<datalist id="erp-codvol-options">
+    {% for unit in known_codvols %}<option value="{{ unit }}">{% endfor %}
+</datalist>
+{% if codvol_missing %}
+<div class="erp-codvol" role="region" aria-label="Produtos sem unidade">
+    <p class="erp-codvol__title">
+        <i class="fa-solid fa-ruler" aria-hidden="true"></i>
+        {{ codvol_missing|length }} produto(s) sem unidade (CODVOL) travando pedidos da fila
+    </p>
+    <p class="erp-codvol__hint">
+        A unidade vem do cadastro do ERP, mas a sincronização ainda não trouxe estes produtos.
+        Informe a sigla da unidade de venda (a mesma do ERP, ex.: UN, CX, PC); os pedidos
+        parados voltam para a fila na hora. Quando o cadastro chegar do ERP, vale o de lá.
+    </p>
+    <ul class="erp-codvol__list">
+        {% for p in codvol_missing %}
+        <li>
+            <span class="erp-codvol__product">
+                <strong>{{ p.erp_codprod or p.sku }}</strong> {{ p.name }}
+                <small>pedido(s) {{ p.orders|join(', ') }}</small>
+            </span>
+            <form method="post" action="{{ url_for('admin_erp_set_codvol') }}" class="erp-codvol__form" data-erp-action>
+                {% include 'partials/csrf_field.html' %}
+                <input type="hidden" name="product_id" value="{{ p.id }}">
+                <input class="admin-field__input erp-codvol__input" name="codvol" list="erp-codvol-options"
+                       maxlength="6" required placeholder="UN" autocomplete="off"
+                       aria-label="Unidade (CODVOL) de {{ p.name }}">
+                <button type="submit" class="admin-btn admin-btn--primary admin-btn--sm">Gravar</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+</div>
+{% endif %}
+<details class="erp-codvol-other" data-erp-keep="codvol-outro">
+    <summary><i class="fa-solid fa-ruler" aria-hidden="true"></i> Informar a unidade (CODVOL) de outro produto</summary>
+    <form method="post" action="{{ url_for('admin_erp_set_codvol') }}" class="erp-codvol__form" data-erp-action>
+        {% include 'partials/csrf_field.html' %}
+        <input class="admin-field__input" name="produto" required placeholder="CODPROD ou SKU"
+               inputmode="numeric" aria-label="CODPROD ou SKU do produto" autocomplete="off">
+        <input class="admin-field__input erp-codvol__input" name="codvol" list="erp-codvol-options"
+               maxlength="6" required placeholder="UN" autocomplete="off" aria-label="Unidade (CODVOL)">
+        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">Gravar unidade</button>
+    </form>
+</details>
+{% if jobs %}
+<div class="erp-table-wrap erp-table-wrap--card">
+    <table class="erp-table erp-table--queue">
+        <thead>
+            <tr>
+                <th>Pedido</th>
+                <th>Cliente</th>
+                <th class="num">Total</th>
+                <th>Situação</th>
+                <th>Detalhe</th>
+                <th class="erp-queue__actions-head" aria-label="Ações"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for job in jobs %}
+            <tr class="erp-queue__row erp-queue__row--{{ job.status }}"
+                data-erp-row="{{ job.id }}" data-erp-row-state="{{ job.status }}:{{ job.attempts }}">
+                <td data-label="Pedido">
+                    <div class="erp-queue__order">
+                        {% if job.event_id %}
+                        <a class="erp-queue__order-number" href="{{ url_for('admin_event_transactions', event_id=job.event_id, pedido=job.order_number) }}#tx-{{ job.transaction_id }}">{{ job.order_number }}</a>
+                        {% else %}
+                        <span class="erp-queue__order-number">{{ job.order_number }}</span>
+                        {% endif %}
+                        <span class="erp-queue__kind erp-queue__kind--{{ job.kind }}">
+                            <i class="fa-solid {{ 'fa-file-invoice' if job.kind == 'pedido' else 'fa-rotate-left' }}" aria-hidden="true"></i>
+                            {{ 'Pedido' if job.kind == 'pedido' else 'Cancelamento' }}
+                        </span>
+                    </div>
+                    {% if job.erp_idpedido %}
+                    <span class="erp-queue__nunota" title="Número deste pedido no ERP (campo IDPEDIDO)">IDPEDIDO <strong>{{ job.erp_idpedido }}</strong></span>
+                    {% endif %}
+                    {% if job.erp_order_id %}
+                    <span class="erp-queue__nunota" title="Número do orçamento no ERP (NUNOTA)">ERP nº <strong>{{ job.erp_order_id }}</strong></span>
+                    {% endif %}
+                    {% if job.erp_codparc %}
+                    <span class="erp-queue__nunota" title="Código do parceiro (cliente) no ERP">Parceiro <strong>{{ job.erp_codparc }}</strong></span>
+                    {% endif %}
+                </td>
+                <td data-label="Cliente">
+                    <span class="erp-queue__client">{{ job.client_name or '—' }}</span>
+                    {% if job.event_name %}
+                    <span class="erp-queue__event"><i class="fa-regular fa-calendar" aria-hidden="true"></i> {{ job.event_name }}</span>
+                    {% endif %}
+                </td>
+                <td class="num" data-label="Total"><span class="erp-queue__total">{{ job.total | brl }}</span></td>
+                <td data-label="Situação">
+                    <span class="admin-badge erp-queue__status {{ queue_status_badges.get(job.status, 'admin-badge--neutral') }}">
+                        <i class="fa-solid {{ queue_status_icons.get(job.status, 'fa-circle') }}" aria-hidden="true"></i>
+                        {{ job.status_label }}
+                    </span>
+                    <span class="erp-queue__meta">
+                        {{ job.attempts }} tentativa{{ '' if job.attempts == 1 else 's' }}
+                        {% if job.status == 'pendente' and job.next_attempt_at %}<br>próxima {{ job.next_attempt_at | datahora }}{% endif %}
+                    </span>
+                </td>
+                <td class="erp-queue__detail" data-label="Detalhe">
+                    {% if job.last_error %}
+                    {% set msg_tone = 'danger' if job.status == 'erro' else ('warn' if job.status in ('pendente', 'processando') else 'neutral') %}
+                    <p class="erp-queue__msg erp-queue__msg--{{ msg_tone }}">
+                        <i class="fa-solid {{ 'fa-circle-exclamation' if msg_tone == 'danger' else ('fa-hourglass-half' if msg_tone == 'warn' else 'fa-circle-info') }}" aria-hidden="true"></i>
+                        <span>{{ job.last_error }}</span>
+                    </p>
+                    {% elif job.status == 'enviado' %}
+                    <p class="erp-queue__msg erp-queue__msg--ok">
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        <span>Recebido pelo ERP{% if job.updated_at %} em {{ job.updated_at | datahora }}{% endif %}.</span>
+                    </p>
+                    {% endif %}
+                    {% if job.payload_pretty or job.response_pretty %}
+                    <div class="erp-queue__dumps">
+                        {% if job.payload_pretty %}
+                        <details class="erp-queue__dump" data-erp-keep="{{ job.id }}-enviados">
+                            <summary><i class="fa-solid fa-arrow-up-from-bracket" aria-hidden="true"></i> Dados enviados</summary>
+                            <pre>{{ job.payload_pretty }}</pre>
+                        </details>
+                        {% endif %}
+                        {% if job.response_pretty %}
+                        <details class="erp-queue__dump" data-erp-keep="{{ job.id }}-resposta">
+                            <summary><i class="fa-solid fa-reply" aria-hidden="true"></i> Resposta</summary>
+                            <pre>{{ job.response_pretty }}</pre>
+                        </details>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if not job.last_error and job.status != 'enviado' and not job.payload_pretty and not job.response_pretty %}
+                    <span class="erp-queue__none">—</span>
+                    {% endif %}
+                </td>
+                <td class="erp-queue__actions{% if job.status not in ('erro', 'pendente', 'descartado') %} is-empty{% endif %}">
+                    {% if job.status in ('erro', 'pendente', 'descartado') %}
+                    <form method="post" action="{{ url_for('admin_erp_job_retry', job_id=job.id) }}" data-erp-action>
+                        {% include 'partials/csrf_field.html' %}
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm" title="Tentar de novo agora">
+                            <i class="fa-solid fa-rotate-right" aria-hidden="true"></i> Reenviar
+                        </button>
+                    </form>
+                    {% endif %}
+                    {% if job.status in ('erro', 'pendente') %}
+                    <form method="post" action="{{ url_for('admin_erp_job_discard', job_id=job.id) }}" data-erp-action
+                          data-confirm="{{ ('Retirar da fila? O pedido não será enviado ao ERP.' if job.kind == 'pedido' else 'Marcar como cancelado? Use depois de cancelar o pedido direto no ERP.') | e }}">
+                        {% include 'partials/csrf_field.html' %}
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm erp-queue__btn-discard">
+                            {% if job.kind == 'pedido' %}<i class="fa-solid fa-ban" aria-hidden="true"></i> Não enviar{% else %}<i class="fa-solid fa-check" aria-hidden="true"></i> Já cancelei no ERP{% endif %}
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="erp-queue-empty">
+    <i class="fa-solid fa-inbox" aria-hidden="true"></i>
+    <p class="erp-queue-empty__title">Nenhum item na fila{% if status_filter %} com essa situação{% endif %}</p>
+    <p class="erp-queue-empty__hint">As vendas confirmadas aparecem aqui assim que entram na fila do ERP.</p>
+</div>
+{% endif %}

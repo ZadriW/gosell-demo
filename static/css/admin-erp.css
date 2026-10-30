@@ -1,0 +1,1012 @@
+/* Integração ERP (Sankhya) — templates/admin/erp.html */
+
+.erp-status-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+}
+
+.erp-status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px;
+}
+
+.erp-status__title {
+    margin: 0;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.erp-status__state {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 700;
+}
+
+.erp-status__state--ok { color: var(--admin-success, #0c8a4d); }
+.erp-status__state--warn { color: var(--admin-warn, #a5620a); }
+.erp-status__state--bad { color: var(--admin-danger, #b91c1c); }
+
+.erp-status__hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+}
+
+.erp-status__list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 13px;
+}
+
+.erp-counts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 0;
+}
+
+.erp-counts dt {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.erp-counts dd {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-counts--bad { color: var(--admin-danger, #b91c1c); }
+
+.erp-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 0 18px 18px;
+    align-items: flex-start;
+}
+
+.erp-form__grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    width: 100%;
+}
+
+.erp-form__grid .admin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.erp-form__check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.erp-table-wrap {
+    overflow-x: auto;
+    margin-bottom: 14px;
+}
+
+#tipos-negociacao form {
+    padding: 0 18px 18px;
+}
+
+.erp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.erp-table th,
+.erp-table td {
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.erp-table th {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.erp-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.erp-table td small {
+    display: block;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    margin-top: 2px;
+}
+
+.erp-table__code {
+    max-width: 120px;
+}
+
+.erp-table__error {
+    max-width: 360px;
+    overflow-wrap: anywhere;
+}
+
+.erp-table__error pre {
+    white-space: pre-wrap;
+    font-size: 11px;
+    max-height: 220px;
+    overflow: auto;
+    margin: 4px 0 0;
+}
+
+.erp-table__error summary {
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 12px;
+}
+
+.erp-table__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* ---------- Filtro da fila (chips com contador) ---------- */
+.erp-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.erp-filter__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 8px 6px 12px;
+    border-radius: var(--radius-pill, 999px);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 600;
+    transition: border-color var(--transition, 160ms), color var(--transition, 160ms),
+                background var(--transition, 160ms);
+}
+
+.erp-filter__chip:first-child {
+    padding-right: 12px;
+}
+
+.erp-filter__chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.erp-filter__chip.is-active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+}
+
+.erp-filter__count {
+    min-width: 20px;
+    padding: 1px 6px;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+}
+
+.erp-filter__count.is-zero {
+    color: var(--color-text-muted);
+    opacity: 0.7;
+}
+
+.erp-filter__chip--erro .erp-filter__count:not(.is-zero) {
+    background: var(--admin-danger, #b91c1c);
+    color: #fff;
+}
+
+.erp-filter__chip.is-active .erp-filter__count {
+    background: rgba(255, 255, 255, 0.22);
+    color: inherit;
+    opacity: 1;
+}
+
+.erp-empty {
+    color: var(--color-text-muted);
+    font-size: 14px;
+    padding: 0 18px 18px;
+    margin: 0;
+}
+
+.erp-history,
+.erp-links {
+    list-style: none;
+    margin: 0;
+    padding: 0 18px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.erp-history li,
+.erp-links li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.erp-history small,
+.erp-links small {
+    color: var(--color-text-muted);
+}
+
+.erp-links__form {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.erp-links__form .admin-field__input {
+    width: 120px;
+}
+
+/* ---------- Fila de envio ---------- */
+.erp-table-wrap--card {
+    background: var(--color-surface);
+    border-radius: var(--radius-md, 14px);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-border);
+}
+
+.erp-table--queue {
+    font-size: 13px;
+    min-width: 860px;
+}
+
+.erp-table--queue thead th {
+    background: var(--color-bg);
+    padding: 11px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.erp-table--queue thead th:first-child { border-top-left-radius: var(--radius-md, 14px); }
+.erp-table--queue thead th:last-child { border-top-right-radius: var(--radius-md, 14px); }
+
+.erp-table--queue tbody td {
+    padding: 14px;
+    vertical-align: top;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.erp-table--queue tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.erp-queue__row {
+    transition: background var(--transition, 160ms);
+}
+
+.erp-queue__row:hover {
+    background: var(--admin-blue-tint-soft, rgba(14, 116, 144, 0.03));
+}
+
+/* Faixa à esquerda com a cor da situação */
+.erp-queue__row > td:first-child {
+    box-shadow: inset 3px 0 0 var(--erp-row-accent, transparent);
+}
+
+.erp-queue__row--erro { --erp-row-accent: var(--admin-danger, #dc2626); }
+.erp-queue__row--pendente,
+.erp-queue__row--processando { --erp-row-accent: var(--admin-info, #2563eb); }
+.erp-queue__row--enviado { --erp-row-accent: var(--admin-success, #0f9d58); }
+.erp-queue__row--descartado { --erp-row-accent: var(--color-border); }
+
+.erp-queue__row--erro {
+    background: rgba(220, 38, 38, 0.035);
+}
+
+.erp-queue__row--descartado .erp-queue__order-number,
+.erp-queue__row--descartado .erp-queue__client,
+.erp-queue__row--descartado .erp-queue__total {
+    color: var(--color-text-muted);
+}
+
+/* Pedido */
+.erp-queue__order {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 8px;
+}
+
+.erp-queue__order-number {
+    font-weight: 700;
+    font-size: 13.5px;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+a.erp-queue__order-number:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.erp-queue__kind {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 8px;
+    border-radius: var(--radius-pill, 999px);
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.erp-queue__kind--cancelamento {
+    background: var(--admin-warn-bg, rgba(232, 137, 11, 0.12));
+    color: var(--admin-warn, #a5620a);
+}
+
+.erp-queue__nunota {
+    display: inline-block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.erp-queue__nunota strong {
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Cliente / evento */
+.erp-queue__client {
+    display: block;
+    font-weight: 600;
+    color: var(--color-text);
+}
+
+.erp-queue__event {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+.erp-queue__total {
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+/* Situação */
+.erp-queue__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    text-transform: none;
+}
+
+.erp-queue__meta {
+    display: block;
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+    white-space: nowrap;
+}
+
+/* Detalhe */
+.erp-queue__detail {
+    width: 38%;
+    min-width: 260px;
+}
+
+.erp-queue__msg {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+    margin: 0;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm, 8px);
+    font-size: 12.5px;
+    line-height: 1.45;
+    overflow-wrap: anywhere;
+}
+
+.erp-queue__msg i {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.erp-queue__msg--danger {
+    background: var(--admin-danger-bg, rgba(220, 38, 38, 0.08));
+    color: var(--admin-danger, #b91c1c);
+}
+
+.erp-queue__msg--warn {
+    background: var(--admin-warn-bg, rgba(232, 137, 11, 0.10));
+    color: var(--admin-warn, #a5620a);
+}
+
+.erp-queue__msg--ok {
+    background: var(--admin-success-bg, rgba(15, 157, 88, 0.08));
+    color: var(--admin-success, #0c8a4d);
+}
+
+.erp-queue__msg--neutral {
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.erp-queue__dumps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.erp-queue__dump[open] {
+    flex-basis: 100%;
+}
+
+.erp-queue__dump summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill, 999px);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    user-select: none;
+    transition: border-color var(--transition, 160ms), color var(--transition, 160ms);
+}
+
+.erp-queue__dump summary::-webkit-details-marker {
+    display: none;
+}
+
+.erp-queue__dump summary:hover,
+.erp-queue__dump[open] summary {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.erp-queue__dump pre {
+    margin: 6px 0 0;
+    padding: 10px 12px;
+    max-height: 260px;
+    overflow: auto;
+    border-radius: var(--radius-sm, 8px);
+    border: 1px solid var(--color-border);
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    /* Mantém a indentação do JSON, mas quebra textos longos (ex.: OBSINTERNA)
+       em vez de esticar a célula; "anywhere" também reduz a largura mínima. */
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.erp-queue__none {
+    color: var(--color-text-muted);
+}
+
+/* Ações */
+.erp-queue__actions-head {
+    width: 1%;
+}
+
+.erp-table--queue td.erp-queue__actions {
+    white-space: nowrap;
+    text-align: right;
+}
+
+.erp-queue__actions form + form {
+    margin-top: 6px;
+}
+
+.erp-queue__actions .admin-btn {
+    width: 100%;
+    justify-content: center;
+}
+
+.erp-queue__btn-discard:hover {
+    border-color: var(--admin-danger, #dc2626);
+    color: var(--admin-danger, #b91c1c);
+}
+
+/* Fila vazia */
+.erp-queue-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 36px 18px;
+    text-align: center;
+    background: var(--color-surface);
+    border: 1px dashed var(--color-border);
+    border-radius: var(--radius-md, 14px);
+    color: var(--color-text-muted);
+}
+
+.erp-queue-empty > i {
+    font-size: 28px;
+    opacity: 0.55;
+    margin-bottom: 4px;
+}
+
+.erp-queue-empty__title {
+    margin: 0;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.erp-queue-empty__hint {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Tema escuro: as cores de situação já vêm de --admin-*; ajusta o realce */
+html.admin-theme--dark .erp-queue__row--erro {
+    background: rgba(240, 113, 120, 0.05);
+}
+
+html.admin-theme--dark .erp-filter__chip.is-active {
+    color: #03051a;
+}
+
+html.admin-theme--dark .erp-filter__chip.is-active .erp-filter__count {
+    background: rgba(3, 5, 26, 0.18);
+}
+
+/* Celular: cada item da fila vira um cartão */
+/* ---------- Unidade (CODVOL) informada à mão — partials/erp_queue.html ---------- */
+
+.erp-codvol {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid rgba(232, 137, 11, 0.35);
+    border-radius: 10px;
+    background: rgba(232, 137, 11, 0.07);
+}
+
+.erp-codvol__title {
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    color: var(--admin-warn, #a5620a);
+}
+
+.erp-codvol__hint {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.erp-codvol__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.erp-codvol__list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 16px;
+    padding: 8px 0;
+    border-top: 1px solid rgba(232, 137, 11, 0.2);
+}
+
+.erp-codvol__product small {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.erp-codvol__form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.erp-codvol__form .admin-field__input {
+    width: auto;
+    min-width: 0;
+}
+
+.erp-codvol__input {
+    max-width: 90px;
+    text-transform: uppercase;
+}
+
+.erp-codvol-other summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.erp-codvol-other[open] summary {
+    margin-bottom: 10px;
+}
+
+html.admin-theme--dark .erp-codvol {
+    background: rgba(251, 191, 36, 0.06);
+    border-color: rgba(251, 191, 36, 0.3);
+}
+
+/* ---------- Painel ao vivo (static/js/admin-erp-live.js) ---------- */
+
+/* O wrapper só marca a área do JS: sem caixa própria, as seções continuam
+   filhas diretas do .admin-main (flex com gap) e mantêm o espaçamento. */
+[data-erp-live-root] {
+    display: contents;
+}
+
+.erp-live-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 6px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+    color: var(--color-primary);
+    background: rgba(14, 116, 144, 0.07);
+}
+
+.erp-sync-progress {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+    padding: 14px 16px;
+    border: 1px solid rgba(14, 116, 144, 0.18);
+    border-radius: 10px;
+    background: rgba(14, 116, 144, 0.035);
+}
+
+.erp-sync-progress__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-primary);
+}
+
+.erp-sync-progress__since {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.erp-sync-progress__step {
+    margin: 0;
+    font-size: 13.5px;
+}
+
+.erp-sync-progress__counts {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px;
+    margin: 0;
+}
+
+.erp-sync-progress__counts dt {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.erp-sync-progress__counts dd {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Barra indeterminada: a fila do gateway não informa o total de lotes. */
+.erp-sync-progress__bar {
+    position: relative;
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(14, 116, 144, 0.10);
+}
+
+.erp-sync-progress__bar span {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 30%;
+    border-radius: inherit;
+    background: var(--color-primary);
+    animation: erp-progress-slide 1.4s ease-in-out infinite;
+}
+
+@keyframes erp-progress-slide {
+    from { transform: translateX(-100%); }
+    to { transform: translateX(340%); }
+}
+
+.erp-sync-progress__inline {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+
+/* Linha que mudou desde a última atualização */
+.erp-live-changed > td {
+    animation: erp-live-flash 1.6s ease-out;
+}
+
+@keyframes erp-live-flash {
+    from { background-color: rgba(250, 204, 21, 0.28); }
+    to { background-color: transparent; }
+}
+
+/* Indicador "ao vivo" ao lado do título da página */
+.erp-live-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    vertical-align: middle;
+    color: var(--color-text-muted);
+}
+
+.erp-live-indicator::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--admin-success, #0c8a4d);
+}
+
+.erp-live-indicator.is-offline::before {
+    background: var(--admin-danger, #b91c1c);
+}
+
+[data-erp-action].is-busy button[type="submit"] {
+    opacity: 0.65;
+    cursor: progress;
+}
+
+html.admin-theme--dark .erp-live-pill,
+html.admin-theme--dark .erp-sync-progress {
+    color: inherit;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+html.admin-theme--dark .erp-sync-progress__head { color: inherit; }
+
+@media (prefers-reduced-motion: reduce) {
+    .erp-sync-progress__bar span,
+    .erp-live-changed > td { animation: none; }
+}
+
+@media (max-width: 760px) {
+    .erp-table-wrap--card {
+        background: transparent;
+        box-shadow: none;
+        border: none;
+        overflow: visible;
+    }
+
+    .erp-table--queue {
+        min-width: 0;
+    }
+
+    .erp-table--queue thead {
+        display: none;
+    }
+
+    .erp-table--queue,
+    .erp-table--queue tbody,
+    .erp-table--queue tr,
+    .erp-table--queue td {
+        display: block;
+        width: 100%;
+    }
+
+    .erp-table--queue tbody {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .erp-queue__row {
+        background: var(--color-surface);
+        border: 1px solid var(--color-border);
+        border-left: 4px solid var(--erp-row-accent, var(--color-border));
+        border-radius: var(--radius-md, 14px);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+
+    /* Cliente e Total lado a lado; o resto ocupa a largura toda */
+    .erp-table--queue tr.erp-queue__row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .erp-table--queue tr.erp-queue__row > td {
+        width: auto;
+        grid-column: 1 / -1;
+    }
+
+    .erp-table--queue tr.erp-queue__row > td[data-label="Cliente"] {
+        grid-column: 1;
+    }
+
+    .erp-table--queue tr.erp-queue__row > td[data-label="Total"] {
+        grid-column: 2;
+        text-align: right;
+    }
+
+    .erp-queue__row > td:first-child {
+        box-shadow: none;
+    }
+
+    .erp-table--queue tbody td,
+    .erp-table--queue tbody tr:last-child td,
+    .erp-table--queue tbody td.num {
+        padding: 10px 14px;
+        border-bottom: 1px solid var(--color-border);
+        text-align: left;
+    }
+
+    .erp-table--queue tbody td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 4px;
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+    }
+
+    .erp-table--queue tbody td[data-label="Pedido"]::before {
+        display: none;
+    }
+
+    .erp-queue__detail {
+        width: auto;
+        min-width: 0;
+    }
+
+    .erp-table--queue td.erp-queue__actions {
+        display: flex;
+        gap: 8px;
+        border-bottom: none;
+        white-space: normal;
+    }
+
+    .erp-queue__actions form {
+        flex: 1;
+    }
+
+    .erp-queue__actions form + form {
+        margin-top: 0;
+    }
+
+    .erp-table--queue td.erp-queue__actions.is-empty {
+        display: none;
+    }
+
+    .erp-queue__row:has(.erp-queue__actions.is-empty) .erp-queue__detail {
+        border-bottom: none;
+    }
+}
+
+/* Tipos de negociação: lista liberada no Sankhya (GET orders/payment) */
+.erp-tv__header {
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.erp-tv__header form { margin: 0; flex: 0 0 auto; }
+
+.erp-tv__source {
+    margin: 8px 0 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.erp-tv__source .fa-circle-check { color: var(--admin-success, #0c8a4d); }
+
+.erp-tv__select {
+    min-width: 260px;
+    max-width: 100%;
+}
+
+.erp-tv__select.is-suggested {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--admin-tint, rgba(14, 116, 144, 0.12));
+}
+
+.erp-tv__name { color: var(--color-text); }
+
+.erp-tv__none { color: var(--color-text-muted); }
+
+.erp-tv__warn {
+    color: var(--admin-warn, #a5620a);
+    font-weight: 600;
+}
+
+.erp-table tr.is-stale td { background: var(--admin-warn-bg, rgba(232, 137, 11, 0.08)); }
+
+.erp-tv__unused {
+    margin: 12px 0 0;
+    color: var(--color-text-muted);
+    font-size: 13px;
+}
+
+.erp-tv__unused span { color: var(--color-text); font-weight: 600; }
+
+.erp-tv__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+@media (max-width: 720px) {
+    .erp-tv__header { flex-direction: column; }
+    .erp-tv__select { min-width: 0; width: 100%; }
+}

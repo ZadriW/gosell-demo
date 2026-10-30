@@ -1,0 +1,449 @@
+{% extends "seller/_layout.html" %}
+{% from "macros/admin_tx_client.html" import admin_tx_client_section %}
+{% from "macros/admin_tx_receipt_link.html" import admin_tx_receipt_link %}
+{% from "macros/admin_tx_pending_actions.html" import admin_tx_pending_actions %}
+{% from "macros/admin_tx_item_cells.html" import admin_tx_item_cells, admin_tx_discount_summary %}
+{% from "macros/admin_tx_note.html" import admin_tx_note_form %}
+
+{% block title %}Dashboard do vendedor - Vendedor | Go Sell{% endblock %}
+
+{% block seller_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-tx.css') }}">
+{% endblock %}
+
+{% block seller_body %}
+{% set tx_writable = event_ops_open(seller_event) if seller_event else true %}
+{% if seller_event %}
+<div class="seller-event-banner">
+    <i class="fa-solid fa-calendar-star" aria-hidden="true"></i>
+    <span>
+        {% if event_ops_open(seller_event) %}
+        Você está operando no evento <strong>{{ seller_event.name }}</strong>. Os dados exibidos são exclusivos deste evento.
+        {% else %}
+        Evento <strong>{{ seller_event.name }}</strong> com operações encerradas. Consulta apenas — vendas e edições bloqueadas.
+        {% endif %}
+    </span>
+</div>
+{% endif %}
+
+<section class="admin-section">
+    <header class="admin-section__header">
+        <h1 class="admin-section__title">Dashboard do vendedor</h1>
+        <p class="admin-section__subtitle">
+            {% if seller_event %}
+                Suas vendas confirmadas no evento <strong>{{ seller_event.name }}</strong>.
+            {% else %}
+                Suas vendas confirmadas registradas no sistema.
+            {% endif %}
+        </p>
+    </header>
+
+    <div class="admin-kpis">
+        <article class="kpi kpi--primary">
+            <span class="kpi__icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
+            <span class="kpi__label">Minhas vendas{% if seller_event %}{% endif %}</span>
+            <span class="kpi__value" data-dash-kpi="transactions_count">{{ stats.transactions_count }}</span>
+            <span class="kpi__hint" data-dash-kpi="transactions_today">{{ stats.transactions_today }} hoje</span>
+        </article>
+
+        <article class="kpi kpi--success">
+            <span class="kpi__icon"><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i></span>
+            <span class="kpi__label">Montante arrecadado{% if seller_event %} (Vendedor){% endif %}</span>
+            <span class="kpi__value" data-dash-kpi="total_revenue">{{ stats.total_revenue | brl }}</span>
+            <span class="kpi__hint" data-dash-kpi="revenue_today">{{ stats.revenue_today | brl }} hoje</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span>
+            <span class="kpi__label">Itens vendidos</span>
+            <span class="kpi__value" data-dash-kpi="items_sold">{{ stats.items_sold }}</span>
+            <span class="kpi__hint">Unidades vendidas por você</span>
+        </article>
+
+        <a class="kpi kpi--link {% if pending_sales_count > 0 %}kpi--warn{% endif %}"
+           href="{{ url_for('seller_dashboard', status='pendente') }}"
+           data-dash-kpi-card="pending_sales"
+           title="Ver carrinhos abandonados{% if seller_event %} no evento {{ seller_event.name }}{% endif %}">
+            <span class="kpi__link-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+            <span class="kpi__icon"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i></span>
+            <span class="kpi__label">Carrinho abandonado{% if seller_event %} no evento{% endif %}</span>
+            <span class="kpi__value" data-dash-kpi="pending_sales">{{ pending_sales_count }}</span>
+            <span class="kpi__hint">Checkout não finalizado (AUT) — toque para ver</span>
+        </a>
+
+        <a class="kpi kpi--link {% if pending_delivery_count > 0 %}kpi--warn{% endif %}"
+           href="{{ url_for('seller_dashboard', entrega='parcial') }}"
+           data-dash-kpi-card="pending_delivery"
+           title="Ver pedidos pagos com itens aguardando retirada{% if seller_event %} no evento {{ seller_event.name }}{% endif %}">
+            <span class="kpi__link-arrow" aria-hidden="true"><i class="fa-solid fa-arrow-right"></i></span>
+            <span class="kpi__icon"><i class="fa-solid fa-box-open" aria-hidden="true"></i></span>
+            <span class="kpi__label">Retiradas pendentes{% if seller_event %} no evento{% endif %}</span>
+            <span class="kpi__value" data-dash-kpi="pending_delivery">{{ pending_delivery_count }}</span>
+            <span class="kpi__hint">Itens pagos aguardando retirada — consulte o administrador</span>
+        </a>
+    </div>
+</section>
+
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title" data-filter-region="titulo">
+                {% if filters.status == 'pendente' %}
+                    Carrinho abandonado{% if seller_event %} no evento{% endif %}
+                {% elif filters.entrega == 'parcial' %}
+                    Retiradas pendentes
+                {% else %}
+                    Histórico de transações
+                {% endif %}
+            </h2>
+            <p class="admin-section__subtitle" data-filter-region="descricao">
+                {% if filters.status == 'pendente' %}
+                    {% if seller_event %}
+                    Seus pedidos com checkout iniciado e ainda sem confirmação de AUT no evento <strong>{{ seller_event.name }}</strong>.
+                    Você pode retomar o carrinho ou descartar cada um.
+                    {% else %}
+                    Seus pedidos com checkout iniciado e ainda sem confirmação de AUT. Você pode retomar o carrinho ou descartar cada um.
+                    {% endif %}
+                {% elif filters.entrega == 'parcial' %}
+                    Pedidos pagos com itens ainda não entregues.
+                    A confirmação de retirada é feita pelo administrador no painel Admin.
+                {% elif seller_event %}
+                Pedidos registrados neste evento em seu nome. Toque em uma linha para ver itens e totais.
+                {% else %}
+                Todas as suas transações registradas no sistema. Toque em uma linha para ver itens e totais.
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    <form class="admin-filters" method="get" action="{{ url_for('seller_dashboard') }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Status</span>
+            <select name="status" class="admin-filter__input">
+                <option value="todos" {% if filters.status == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="confirmado" {% if filters.status == 'confirmado' %}selected{% endif %}>Pago</option>
+                <option value="pendente" {% if filters.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                <option value="cancelado" {% if filters.status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                <option value="estornado" {% if filters.status == 'estornado' %}selected{% endif %}>Estornado</option>
+                <option value="entregue" {% if filters.status == 'entregue' %}selected{% endif %}>Entregue</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Entrega futura</span>
+            <select name="entrega" class="admin-filter__input"
+                    title="Pedidos com itens aguardando retirada (estoque ainda não baixado)">
+                <option value="todos" {% if filters.entrega == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="parcial" {% if filters.entrega == 'parcial' %}selected{% endif %}>Retirada pendente</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data do pedido</span>
+            <input type="date" name="data" class="admin-filter__input"
+                   value="{{ filters.data }}"
+                   title="Filtrar pelo dia da transação (data de registro no sistema); deixe vazio para todos os dias">
+        </label>
+
+        <label class="admin-filter admin-filter--wide">
+            <span class="admin-filter__label">Código do pedido</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-receipt admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="pedido"
+                    value="{{ filters.pedido }}"
+                    class="admin-filter__input"
+                    placeholder="Código do pedido ou nome do cliente…"
+                    autocomplete="off"
+                    inputmode="search"
+                    aria-describedby="hint-filtro-pedido-seller-dash"
+                >
+            </span>
+            <span id="hint-filtro-pedido-seller-dash" class="admin-filter__hint">
+                Busca pelo número do pedido (ex.: OM260422-1234) ou pelo nome do cliente.
+            </span>
+        </label>
+
+        <input type="hidden" name="page" value="1" aria-hidden="true">
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('seller_dashboard') }}" class="admin-btn admin-btn--ghost">Limpar</a>
+        </div>
+    </form>
+
+    {#
+        Histórico de transações: mesmo visual do histórico do evento no admin
+        (static/css/admin-tx.css, .admin-txv), na variante .admin-txv--seller,
+        sem a coluna Vendedor. Classes admin-tx__* ficam onde o admin.js depende
+        delas (abrir/fechar a linha, copiar pedido, formulários do detalhe).
+    #}
+    {% set txv_status = {
+        'entregue': ('Entregue', 'fa-handshake', 'teal'),
+        'confirmado': ('Pago', 'fa-check', 'success'),
+        'pendente': ('Pendente', 'fa-clock', 'warn'),
+        'cancelado': ('Cancelado', 'fa-xmark', 'danger'),
+        'estornado': ('Estornado', 'fa-rotate-left', 'neutral'),
+    } %}
+    {% set txv_pay_icons = {
+        'pix': 'fa-brands fa-pix',
+        'pix_inter': 'fa-brands fa-pix',
+        'credito': 'fa-regular fa-credit-card',
+        'cartao': 'fa-regular fa-credit-card',
+        'debito': 'fa-solid fa-credit-card',
+        'dinheiro': 'fa-solid fa-money-bill-wave',
+        'faturado': 'fa-solid fa-file-invoice-dollar',
+    } %}
+
+    <div class="admin-txv__toolbar">
+        <p class="admin-txv__count" data-seller-tx-subtitle data-filter-region="resumo">
+            {% if pagination.total > 0 %}
+            <strong>{{ pagination.total }}</strong> transaç{{ 'ão' if pagination.total == 1 else 'ões' }}
+            <span class="admin-txv__count-sep" aria-hidden="true">·</span>
+            mostrando {{ pagination.showing_from }}–{{ pagination.showing_to }}
+            {% if pagination.total_pages > 1 %}
+            <span class="admin-txv__count-sep" aria-hidden="true">·</span>
+            página {{ pagination.page }} de {{ pagination.total_pages }}
+            {% endif %}
+            {% else %}
+            Nenhuma transação para os filtros aplicados.
+            {% endif %}
+        </p>
+        <ul class="admin-txv__legend" aria-label="Ações rápidas da lista">
+            <li><span class="admin-txv__legend-icon"><i class="fa-solid fa-clipboard-list" aria-hidden="true"></i></span> Nota de retirada</li>
+            <li><span class="admin-txv__legend-icon admin-txv__legend-icon--restore"><i class="fa-solid fa-cart-shopping" aria-hidden="true"></i></span> Refazer carrinho</li>
+            <li><span class="admin-txv__legend-icon admin-txv__legend-icon--danger"><i class="fa-solid fa-xmark" aria-hidden="true"></i></span> Apagar carrinho</li>
+        </ul>
+    </div>
+
+    <div id="lista" class="admin-table admin-txv admin-txv--seller" role="table" aria-label="Histórico de transações do vendedor" data-filter-region="tabela">
+        <div class="admin-table__head admin-txv__head" role="row">
+            <span class="admin-txv__cell admin-txv__cell--toggle" aria-hidden="true"></span>
+            <span class="admin-txv__cell" role="columnheader">Pedido</span>
+            <span class="admin-txv__cell" role="columnheader">Data</span>
+            <span class="admin-txv__cell admin-txv__cell--center" role="columnheader">Itens</span>
+            <span class="admin-txv__cell admin-txv__cell--num" role="columnheader">Total</span>
+            <span class="admin-txv__cell" role="columnheader">Pagamento</span>
+            <span class="admin-txv__cell" role="columnheader">Situação</span>
+            <span class="admin-txv__cell admin-txv__cell--actions" role="columnheader" aria-label="Ações"></span>
+        </div>
+
+        {% if transactions %}
+            {% for tx in transactions %}
+            {% set st = (tx.status or '')|lower %}
+            {% set st_key = 'entregue' if st == 'confirmado' and (tx.handover_status or '')|lower == 'entregue' else st %}
+            {% set st_label, st_icon, st_tone = txv_status.get(st_key, (tx.status or '—', 'fa-circle', 'neutral')) %}
+            {% set delivery_pending = st == 'confirmado' and (tx.delivery_status or 'completa') in ('parcial', 'pendente') %}
+            {% set created = (tx.created_at | datahora).split(' ') %}
+            {% set pm = (tx.payment_method or '')|lower %}
+            <div class="admin-tx admin-txv__tx" id="tx-{{ tx.id }}" data-tx-id="{{ tx.id }}">
+                <div
+                    class="admin-tx__row admin-txv__row admin-txv__row--{{ st_key }}"
+                    role="button"
+                    tabindex="0"
+                    aria-expanded="false"
+                    aria-controls="seller-tx-details-{{ tx.id }}"
+                >
+                    <span class="admin-txv__cell admin-txv__cell--toggle">
+                        <i class="fa-solid fa-chevron-right admin-tx__chevron" aria-hidden="true"></i>
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__order">
+                        <span class="admin-txv__order-ref">
+                            <span class="admin-txv__order-number">{{ tx.order_number }}</span>
+                            <span
+                                class="admin-tx__copy-order admin-txv__copy"
+                                role="button"
+                                tabindex="0"
+                                data-copy-order="{{ tx.order_number }}"
+                                title="Copiar código do pedido"
+                                aria-label="Copiar código do pedido {{ tx.order_number }}"
+                            ><i class="fa-regular fa-copy" aria-hidden="true"></i></span>
+                        </span>
+                        <span class="admin-txv__client" title="{{ tx.client_name or '' }}">{{ tx.client_name or 'Cliente não informado' }}</span>
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__date">
+                        <span class="admin-txv__date-day">{{ created[0] }}</span>
+                        {% if created|length > 1 %}<span class="admin-txv__date-time">{{ created[1] }}</span>{% endif %}
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__cell--center admin-txv__items-count">
+                        <span class="admin-txv__qty" title="{{ tx.items_count }} ite{{ 'm' if tx.items_count == 1 else 'ns' }}">{{ tx.items_count }}</span>
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__cell--num admin-txv__total">{{ tx.total | brl }}</span>
+
+                    <span class="admin-txv__cell admin-txv__pay">
+                        <i class="{{ txv_pay_icons.get(pm, 'fa-solid fa-wallet') }} admin-txv__pay-icon" aria-hidden="true"></i>
+                        <span>{{ tx.payment_method | paymethod(tx.card_installments) }}</span>
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__status">
+                        <span class="admin-txv__pill admin-txv__pill--{{ st_tone }}">
+                            <i class="fa-solid {{ st_icon }}" aria-hidden="true"></i>{{ st_label }}
+                        </span>
+                        {% if delivery_pending %}
+                        <span class="admin-txv__chips">
+                            <span class="admin-txv__chip admin-txv__chip--warn" title="Há itens pagos aguardando retirada — a confirmação é feita pelo administrador">
+                                <i class="fa-solid fa-box-open" aria-hidden="true"></i>Retirada pendente
+                            </span>
+                        </span>
+                        {% endif %}
+                    </span>
+
+                    <span class="admin-txv__cell admin-txv__cell--actions admin-txv__actions">
+                        {{ admin_tx_receipt_link(tx) }}
+                        {{ admin_tx_pending_actions(tx, writable=tx_writable) }}
+                    </span>
+                </div>
+
+                <div class="admin-tx__details admin-txv__details" id="seller-tx-details-{{ tx.id }}" hidden>
+                    <div class="admin-tx__details-inner admin-txv__details-grid">
+                        {% set tx_items = tx['items'] %}
+                        <div class="admin-txv__details-main">
+                            <section class="admin-txv__block">
+                                <h3 class="admin-txv__block-title">
+                                    <i class="fa-solid fa-basket-shopping" aria-hidden="true"></i>
+                                    Itens do pedido
+                                    <span class="admin-txv__block-count">
+                                        {{ tx_items|length }} produto{% if tx_items|length != 1 %}s{% endif %}
+                                    </span>
+                                </h3>
+                                <div class="admin-tx__items">
+                                    <div class="admin-tx__items-head">
+                                        <span>Produto</span>
+                                        <span>SKU</span>
+                                        <span class="admin-tx__category">Categoria</span>
+                                        <span class="admin-table__col--num">Qtd.</span>
+                                        <span class="admin-table__col--num">Unit.</span>
+                                        <span class="admin-table__col--num">Subtotal</span>
+                                    </div>
+                                    {% for it in tx_items %}
+                                    <div class="admin-tx__items-row">
+                                        {{ admin_tx_item_cells(it, seller_id=seller_id) }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </section>
+
+                            <section class="admin-txv__block admin-txv__block--client">
+                                {{ admin_tx_client_section(tx) }}
+                            </section>
+                        </div>
+
+                        <aside class="admin-txv__details-aside" aria-label="Resumo do pedido {{ tx.order_number }}">
+                            <div class="admin-txv__card">
+                                <h3 class="admin-txv__block-title">
+                                    <i class="fa-solid fa-receipt" aria-hidden="true"></i>
+                                    Pagamento
+                                </h3>
+                                <div class="admin-tx__summary admin-txv__summary">
+                                    <div class="admin-tx__summary-row">
+                                        <span>Forma</span>
+                                        <strong class="admin-txv__pay">
+                                            <i class="{{ txv_pay_icons.get(pm, 'fa-solid fa-wallet') }} admin-txv__pay-icon" aria-hidden="true"></i>
+                                            {{ tx.payment_method | paymethod(tx.card_installments) }}
+                                        </strong>
+                                    </div>
+                                    {% set parcelas_txt = tx.total | parcelas_cartao(tx.payment_method, tx.card_installments) %}
+                                    {% if parcelas_txt %}
+                                    <div class="admin-tx__summary-row">
+                                        <span>Parcelas</span>
+                                        <strong>{{ parcelas_txt }}</strong>
+                                    </div>
+                                    {% endif %}
+                                    {% if tx.aut %}
+                                    <div class="admin-tx__summary-row">
+                                        <span>AUT</span>
+                                        <strong><code class="admin-txv__code">{{ tx.aut }}</code></strong>
+                                    </div>
+                                    {% endif %}
+                                    {{ admin_tx_discount_summary(tx_items, tx.total) }}
+                                    <div class="admin-tx__summary-row admin-tx__summary-row--total">
+                                        <span>Total</span>
+                                        <strong>{{ tx.total | brl }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if (tx.receipt_note or '')|trim or tx_writable %}
+                            <div class="admin-txv__card admin-txv__card--note">
+                                <h3 class="admin-txv__block-title">
+                                    <i class="fa-regular fa-note-sticky" aria-hidden="true"></i>
+                                    Observação na nota
+                                </h3>
+                                {% if not (tx.receipt_note or '')|trim %}
+                                <p class="admin-txv__muted admin-txv__note-empty">Sem observação. O texto aparece no rodapé da nota de retirada.</p>
+                                {% endif %}
+                                {{ admin_tx_note_form(tx, 'seller_transaction_note', writable=tx_writable) }}
+                            </div>
+                            {% endif %}
+
+                            {% if st == 'pendente' and tx_writable %}
+                            <div class="admin-tx__actions admin-txv__danger-zone">
+                                <a class="admin-btn admin-btn--ghost admin-btn--sm"
+                                   href="{{ url_for('seller_restore_pending_checkout', tx_id=tx.id) }}"
+                                   aria-label="Refazer carrinho e retomar o pagamento deste pedido">
+                                    <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                                    Refazer carrinho
+                                </a>
+                                {{ admin_tx_pending_actions(tx, writable=tx_writable, show_restore=False, variant='button') }}
+                            </div>
+                            {% endif %}
+                        </aside>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-txv__empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p class="admin-txv__empty-title">Nenhuma transação encontrada</p>
+                <p class="admin-txv__empty-hint">Ajuste ou limpe os filtros acima para ver mais vendas.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="admin-filter-region" data-filter-region="paginacao">
+    {% if pagination.total_pages > 1 %}
+    <nav class="admin-pagination admin-txv__pagination" aria-label="Paginação das transações">
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('seller_dashboard', pedido=filters.pedido, status=filters.status, entrega=filters.entrega, data=filters.data, page=pagination.page - 1) }}#lista"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            <span class="admin-txv__page">Página {{ pagination.page }} de {{ pagination.total_pages }}</span>
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('seller_dashboard', pedido=filters.pedido, status=filters.status, entrega=filters.entrega, data=filters.data, page=pagination.page + 1) }}#lista"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,38 @@
+{# Bloqueio por inatividade nas telas de checkout do vendedor. #}
+<div
+    id="idle-timeout-overlay"
+    class="idle-modal-overlay"
+    aria-hidden="true"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="idle-timeout-title"
+    aria-describedby="idle-timeout-text"
+>
+    <div class="idle-modal-dialog idle-modal-dialog--lock" role="document">
+        <div class="idle-modal-dialog__icon" aria-hidden="true">
+            <i class="fa-solid fa-lock"></i>
+        </div>
+        <h2 class="idle-modal-dialog__title" id="idle-timeout-title">Checkout bloqueado</h2>
+        <p class="idle-modal-dialog__text" id="idle-timeout-text">
+            Por inatividade, esta venda foi bloqueada. Informe a senha de login do vendedor para continuar.
+        </p>
+        <form class="idle-modal-dialog__form" id="idle-timeout-form" autocomplete="off" novalidate>
+            <label class="idle-modal-dialog__field" for="idle-timeout-password">
+                <span class="idle-modal-dialog__label">Senha</span>
+                <input
+                    id="idle-timeout-password"
+                    class="idle-modal-dialog__input"
+                    type="password"
+                    name="password"
+                    autocomplete="current-password"
+                    required
+                    maxlength="128"
+                >
+            </label>
+            <p class="idle-modal-dialog__error" id="idle-timeout-error" role="alert" hidden></p>
+            <button type="submit" class="idle-modal-dialog__btn" id="idle-timeout-unlock">
+                Continuar venda
+            </button>
+        </form>
+    </div>
+</div>

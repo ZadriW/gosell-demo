@@ -1,0 +1,491 @@
+{% extends "admin/_layout.html" %}
+{% from 'macros/admin_event_operation_type.html' import event_operation_type_field %}
+
+{% block title %}{{ event.name }} - {{ event.operation_type | event_operation_type_label }} | Go Sell{% endblock %}
+
+{% block admin_body %}
+{% set op_noun = event|op_noun %}
+{% set op_noun_l = event|op_noun(lower=True) %}
+{% set op_nouns_l = event|op_noun(plural=True, lower=True) %}
+{# Editar/encerrar/arquivar/excluir: só quem gerencia eventos (o Marketing vê o dashboard sem eles). #}
+{% set can_manage_event = can('eventos', event.id) %}
+
+{# ============================================================ Sub-nav do evento #}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:4px;">
+                <h1 class="admin-section__title">{{ event.name }}</h1>
+                {% if not event.active %}
+                <span class="admin-badge admin-badge--neutral">Arquivado</span>
+                {% elif event.operations_closed %}
+                <span class="admin-badge admin-badge--warn">Encerrado</span>
+                {% else %}
+                <span class="admin-badge admin-badge--success">Ativo</span>
+                {% endif %}
+                <span class="admin-badge admin-badge--info">{{ event.operation_type | event_operation_type_label }}</span>
+            </div>
+            {% if event.description %}
+            <p class="admin-section__subtitle admin-event-header__desc">{{ event.description }}</p>
+            {% else %}
+            <p class="admin-section__subtitle admin-event-header__desc admin-event-header__desc--muted">Sem descrição</p>
+            {% endif %}
+        </div>
+        {% if can_manage_event %}
+        <div class="admin-event-header__actions">
+            {% if event_ops_open(event) %}
+            <button type="button" class="admin-event-edit-trigger"
+                    id="event-edit-open"
+                    aria-haspopup="dialog"
+                    aria-controls="event-edit-modal"
+                    aria-expanded="false">
+                <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+                <span>Editar {{ op_noun_l }}</span>
+            </button>
+            {% endif %}
+            {% if event.active %}
+            {% if event_ops_open(event) %}
+            <form
+                method="post"
+                action="{{ url_for('admin_event_close_operations', event_id=event.id) }}"
+                style="display:contents;"
+                data-confirm="Encerrar as operações deste {{ op_noun_l }}? Admin e vendedores passam a consultar estoque, vendas e transações apenas em modo leitura. Novas vendas e edições ficam bloqueadas até reabrir."
+                data-confirm-title="Encerrar operações de {{ event.name|e }}?"
+                data-confirm-label="Encerrar operações"
+            >
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--warn">
+                    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+                    Encerrar operações
+                </button>
+            </form>
+            {% else %}
+            <form
+                method="post"
+                action="{{ url_for('admin_event_reopen_operations', event_id=event.id) }}"
+                style="display:contents;"
+                data-confirm="Reabrir as operações deste {{ op_noun_l }}? Vendas e edições voltam a ser permitidas."
+                data-confirm-title="Reabrir operações de {{ event.name|e }}?"
+                data-confirm-label="Reabrir"
+                data-confirm-destructive="false"
+            >
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost">
+                    <i class="fa-solid fa-lock-open" aria-hidden="true"></i>
+                    Reabrir operações
+                </button>
+            </form>
+            {% endif %}
+            <form method="post" action="{{ url_for('admin_event_archive', event_id=event.id) }}" style="display:contents;">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost"
+                    onclick="return confirm('Arquivar o {{ op_noun_l }} {{ event.name|e }}?');">
+                    <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                    Arquivar
+                </button>
+            </form>
+            {% else %}
+            <form method="post" action="{{ url_for('admin_event_restore', event_id=event.id) }}" style="display:contents;">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost">
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                    Reativar
+                </button>
+            </form>
+            {% endif %}
+            <form
+                method="post"
+                action="{{ url_for('admin_event_delete', event_id=event.id) }}"
+                class="admin-event-header__delete-form"
+                data-confirm="{{ ('Serão removidos produtos do ' ~ op_noun_l ~ ', promoções, vínculos com vendedores, transações e movimentações de estoque. Esta ação não pode ser desfeita.') | e }}"
+                data-confirm-title="Excluir {{ op_noun_l }} {{ event.name|e }}?"
+                data-confirm-label="Excluir"
+            >
+                {% include 'partials/csrf_field.html' %}
+                <button
+                    type="submit"
+                    class="admin-btn admin-btn--danger admin-btn--icon-only"
+                    title="Excluir {{ op_noun_l }}"
+                    aria-label="Excluir {{ op_noun_l }} {{ event.name }}"
+                >
+                    <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    {# KPIs #}
+    <div class="admin-kpis">
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-tags" aria-hidden="true"></i></span>
+            <span class="kpi__label">Produtos no {{ op_noun_l }}</span>
+            <span class="kpi__value">{{ stats.products_count }}</span>
+            <span class="kpi__hint">Adicionados manualmente</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-warehouse" aria-hidden="true"></i></span>
+            <span class="kpi__label">Unidades em estoque</span>
+            <span class="kpi__value">{{ stats.units_in_stock }}</span>
+            <span class="kpi__hint">Somatório do {{ op_noun_l }}</span>
+        </article>
+
+        <article class="kpi kpi--success">
+            <span class="kpi__icon"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>
+            <span class="kpi__label">Valor em estoque</span>
+            <span class="kpi__value">{{ stats.stock_value | brl }}</span>
+            <span class="kpi__hint">A preço de catálogo</span>
+        </article>
+
+        <article class="kpi {% if stats.below_min > 0 %}kpi--warn{% endif %}">
+            <span class="kpi__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+            <span class="kpi__label">Abaixo do mínimo</span>
+            <span class="kpi__value">{{ stats.below_min }}</span>
+            <span class="kpi__hint">{{ stats.sem_estoque }} sem estoque</span>
+        </article>
+    </div>
+
+    <div class="admin-event-dash-sales" aria-labelledby="event-dash-sales-title">
+        <div class="admin-event-dash-sales__intro">
+            <h2 id="event-dash-sales-title" class="admin-event-dash-sales__title">Desempenho de vendas</h2>
+            <p class="admin-event-dash-sales__subtitle">
+                Pedidos confirmados no Go Sell com estoque baixado neste {{ op_noun_l }}.
+                Ticket médio = receita ÷ quantidade de pedidos.
+            </p>
+        </div>
+
+        <div class="admin-kpis admin-kpis--sales-dash">
+            <article class="kpi kpi--primary">
+                <span class="kpi__icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
+                <span class="kpi__label">Pedidos no {{ op_noun_l }}</span>
+                <span class="kpi__value">{{ sales_dashboard.orders_count }}</span>
+                <span class="kpi__hint">Total histórico</span>
+            </article>
+            <article class="kpi kpi--success">
+                <span class="kpi__icon"><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i></span>
+                <span class="kpi__label">Receita total</span>
+                <span class="kpi__value">{{ sales_dashboard.revenue_total | brl }}</span>
+                <span class="kpi__hint">Soma dos pedidos</span>
+            </article>
+            <article class="kpi">
+                <span class="kpi__icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
+                <span class="kpi__label">Ticket médio</span>
+                <span class="kpi__value">
+                    {% if sales_dashboard.orders_count > 0 %}
+                        {{ sales_dashboard.avg_ticket | brl }}
+                    {% else %}
+                        —
+                    {% endif %}
+                </span>
+                <span class="kpi__hint">Valor médio por pedido</span>
+            </article>
+        </div>
+
+        {% set dash_goals = sales_dashboard.goals or {} %}
+        <div class="admin-event-dash-sales__goals">
+            <div class="admin-event-dash-sales__goals-head">
+                <h3 class="admin-event-dash-sales__panel-title">
+                    <i class="fa-solid fa-bullseye" aria-hidden="true"></i>
+                    Metas do {{ op_noun_l }}
+                </h3>
+                {# Sem o Financeiro (ex.: Marketing), as metas se definem aqui mesmo. #}
+                {% set goals_inline = not can('financeiro') and event_ops_open(event) %}
+                {% if can('financeiro') %}
+                <a class="admin-event-dash-sales__goals-link"
+                   href="{{ url_for('admin_financeiro', evento=event.id) }}">
+                    Definir no Financeiro
+                    <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                </a>
+                {% elif goals_inline %}
+                <button type="button" class="admin-event-dash-sales__goals-link"
+                        id="dash-goals-toggle" aria-expanded="false" aria-controls="dash-goals-form">
+                    <i class="fa-solid fa-pen" aria-hidden="true"></i>
+                    Definir metas
+                </button>
+                {% endif %}
+            </div>
+            <div class="admin-event-dash-sales__goals-cards">
+                {% from "macros/admin_goals.html" import goal_card %}
+                {{ goal_card(dash_goals.revenue, 'revenue', compact=true) }}
+                {{ goal_card(dash_goals.volume, 'volume', compact=true) }}
+            </div>
+            {% if goals_inline %}
+            <form class="admin-fin-goals__form admin-event-dash-sales__goals-form"
+                  id="dash-goals-form" method="post" hidden
+                  action="{{ url_for('admin_event_goals', event_id=event.id) }}">
+                {% include 'partials/csrf_field.html' %}
+                <input type="hidden" name="next" value="dashboard">
+                <p class="admin-fin-goals__form-title">Definir metas</p>
+                <div class="admin-event-dash-sales__goals-fields">
+                    <label class="admin-field">
+                        <span class="admin-field__label">Meta de faturamento (R$)</span>
+                        <input type="text" name="revenue_goal" class="admin-field__input"
+                               inputmode="decimal" autocomplete="off" placeholder="Ex.: 50.000,00"
+                               value="{% if dash_goals.revenue_goal is not none %}{{ '%.2f' | format(dash_goals.revenue_goal) | replace('.', ',') }}{% endif %}">
+                    </label>
+                    <label class="admin-field">
+                        <span class="admin-field__label">Meta de volume (unidades)</span>
+                        <input type="number" name="volume_goal" class="admin-field__input"
+                               min="0" step="1" inputmode="numeric" placeholder="Ex.: 200"
+                               value="{% if dash_goals.volume_goal is not none %}{{ dash_goals.volume_goal | int }}{% endif %}">
+                    </label>
+                </div>
+                <p class="admin-fin-goals__form-hint">Deixe em branco para remover a meta.</p>
+                <div class="admin-event-dash-sales__goals-actions">
+                    <button type="submit" class="admin-btn admin-btn--primary admin-btn--sm">
+                        <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                        Salvar metas
+                    </button>
+                    <button type="button" class="admin-btn admin-btn--ghost admin-btn--sm" id="dash-goals-cancel">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+            {% endif %}
+        </div>
+
+        {# ── Gráficos analíticos (d3) — desenhados por static/js/admin-charts.js ── #}
+        <div class="admin-event-dash-sales__charts admin-event-dash-sales__charts--series">
+            <figure class="admin-chart" data-admin-chart="revenue-by-day">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-chart-column" aria-hidden="true"></i>
+                        Receita por dia
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Série contínua do primeiro ao último dia com vendas — dias sem pedido
+                        aparecem zerados, para não distorcer o ritmo do {{ op_noun_l }}.
+                    </p>
+                </figcaption>
+            </figure>
+
+            <figure class="admin-chart" data-admin-chart="top-products">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-ranking-star" aria-hidden="true"></i>
+                        Produtos mais vendidos
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Top {{ sales_analytics.top_products | length }} por unidades vendidas.
+                        A receita de cada um aparece no detalhe.
+                    </p>
+                </figcaption>
+            </figure>
+        </div>
+
+        <div class="admin-event-dash-sales__charts admin-event-dash-sales__charts--pairs">
+            <figure class="admin-chart" data-admin-chart="orders-by-hour">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-clock" aria-hidden="true"></i>
+                        Pedidos por hora
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Distribuição dos pedidos ao longo do dia — indica os horários de pico
+                        para dimensionar equipe e estoque no balcão.
+                    </p>
+                </figcaption>
+            </figure>
+
+            <figure class="admin-chart" data-admin-chart="sellers">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+                        Receita por vendedor
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Quanto cada vendedor fechou neste {{ op_noun_l }}, do maior para o menor.
+                    </p>
+                </figcaption>
+            </figure>
+
+            <figure class="admin-chart" data-admin-chart="payment-mix">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                        Composição por forma de pagamento
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Participação de cada meio de pagamento na receita confirmada.
+                    </p>
+                </figcaption>
+            </figure>
+
+            <figure class="admin-chart" data-admin-chart="stock-health">
+                <figcaption class="admin-chart__head">
+                    <h3 class="admin-chart__title">
+                        <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>
+                        Saúde do estoque
+                    </h3>
+                    <p class="admin-chart__hint">
+                        Situação atual dos {{ stats.products_count }} produto(s) do {{ op_noun_l }}:
+                        saudáveis, abaixo do mínimo e sem estoque.
+                    </p>
+                </figcaption>
+            </figure>
+        </div>
+    </div>
+</section>
+
+{% if can_manage_event and event_ops_open(event) %}
+<dialog class="admin-modal" id="event-edit-modal" aria-labelledby="event-edit-modal-title">
+    <div class="admin-modal__panel">
+        <header class="admin-modal__header">
+            <h2 class="admin-modal__title" id="event-edit-modal-title">Editar {{ op_noun_l }}</h2>
+            <button type="button" class="admin-modal__close" id="event-edit-close" aria-label="Fechar">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <form method="post" action="{{ url_for('admin_event_edit', event_id=event.id) }}" class="admin-modal__body">
+            {% include 'partials/csrf_field.html' %}
+            <div class="admin-field">
+                <label class="admin-field__label" for="event-modal-name">Nome do {{ op_noun_l }} <span aria-hidden="true">*</span></label>
+                <input id="event-modal-name" type="text" name="name" class="admin-field__input"
+                    value="{{ event.name }}" required maxlength="200" autocomplete="off">
+            </div>
+            {{ event_operation_type_field('event-modal-operation-type', event.operation_type or 'evento') }}
+            <div class="admin-field">
+                <label class="admin-field__label" for="event-modal-desc">Descrição (opcional)</label>
+                <input id="event-modal-desc" type="text" name="description" class="admin-field__input"
+                    value="{{ event.description or '' }}" maxlength="500" autocomplete="off"
+                    placeholder="Data, local ou observações">
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="modal-event-badge-default">Cor do badge (menu e movimentações)</label>
+                <label class="admin-field__hint-row">
+                    <input
+                        id="modal-event-badge-default"
+                        type="checkbox"
+                        name="badge_use_default"
+                        value="1"
+                        {% if not event.badge_color %}checked{% endif %}
+                    >
+                    Usar cor padrão do tema
+                </label>
+                <div id="modal-event-badge-color-wrap" class="admin-event-badge-color-wrap" {% if not event.badge_color %}hidden{% endif %}>
+                    <input
+                        id="modal-event-badge-color"
+                        type="color"
+                        name="badge_color"
+                        value="{{ event.badge_color or '#0e7490' }}"
+                        class="admin-event-badge-color-input"
+                        aria-label="Escolher cor do badge"
+                    >
+                </div>
+            </div>
+            <footer class="admin-modal__footer">
+                <button type="button" class="admin-btn admin-btn--ghost" id="event-edit-cancel">Cancelar</button>
+                <button type="submit" class="admin-btn admin-btn--primary">
+                    <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                    Salvar alterações
+                </button>
+            </footer>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+
+{# Vendedores associados #}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title">Vendedores no {{ op_noun_l }}</h2>
+            <p class="admin-section__subtitle">{{ sellers | length }} vendedor(es) associado(s).</p>
+        </div>
+        {% if can('usuarios') %}
+        <a class="admin-btn admin-btn--ghost" href="{{ url_for('admin_sellers') }}">
+            <i class="fa-solid fa-users" aria-hidden="true"></i>
+            Usuários
+        </a>
+        {% endif %}
+    </header>
+    {% if sellers %}
+    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:0 0 8px;">
+        {% for s in sellers %}
+        <span class="admin-badge admin-badge--{% if s.active %}success{% else %}neutral{% endif %}" style="font-size:13px;padding:6px 14px;">
+            <i class="fa-solid fa-user-tie" aria-hidden="true"></i>
+            {{ s.name }}
+        </span>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="admin-section__subtitle" style="padding:8px 0;">
+        Nenhum vendedor associado.
+        {% if can('usuarios') %}<a href="{{ url_for('admin_sellers') }}">Defina o evento de venda em Usuários</a>.{% endif %}
+    </p>
+    {% endif %}
+</section>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{# Séries dos gráficos: JSON inerte lido por admin-charts.js. #}
+<script type="application/json" id="event-analytics-data">{{ sales_analytics | tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/d3/d3.min.js') }}"></script>
+{# Visual anterior dos gráficos, usado só no mobile (≤767px). #}
+<script src="{{ url_for('static', filename='js/admin-charts-legacy.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-charts.js') }}"></script>
+<script>
+(() => {
+    // Formulário de metas no dashboard (contas sem o Financeiro).
+    const toggle = document.getElementById('dash-goals-toggle');
+    const form = document.getElementById('dash-goals-form');
+    if (!toggle || !form) return;
+    const setOpen = (open) => {
+        form.hidden = !open;
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (open) form.querySelector('input[name="revenue_goal"]')?.focus();
+    };
+    toggle.addEventListener('click', () => setOpen(form.hidden));
+    document.getElementById('dash-goals-cancel')?.addEventListener('click', () => {
+        form.reset();
+        setOpen(false);
+        toggle.focus();
+    });
+})();
+(() => {
+    const dialog = document.getElementById('event-edit-modal');
+    const openBtn = document.getElementById('event-edit-open');
+    const closeBtn = document.getElementById('event-edit-close');
+    const cancelBtn = document.getElementById('event-edit-cancel');
+    const badgeDefaultCb = document.getElementById('modal-event-badge-default');
+    const badgeColorWrap = document.getElementById('modal-event-badge-color-wrap');
+    if (!dialog || !openBtn) return;
+
+    function syncBadgeColorVisibility() {
+        if (!badgeDefaultCb || !badgeColorWrap) return;
+        badgeColorWrap.hidden = badgeDefaultCb.checked;
+    }
+    badgeDefaultCb?.addEventListener('change', syncBadgeColorVisibility);
+
+    function setOpen(expanded) {
+        openBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+
+    openBtn.addEventListener('click', () => {
+        dialog.showModal();
+        setOpen(true);
+        const first = dialog.querySelector('input[name="name"]');
+        if (first) {
+            requestAnimationFrame(() => { first.focus(); first.select(); });
+        }
+    });
+
+    function closeModal() {
+        dialog.close();
+        setOpen(false);
+        openBtn.focus();
+    }
+
+    closeBtn?.addEventListener('click', closeModal);
+    cancelBtn?.addEventListener('click', closeModal);
+
+    dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) closeModal();
+    });
+
+    dialog.addEventListener('close', () => setOpen(false));
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,257 @@
+{% extends "seller/_layout.html" %}
+{% from "macros/admin_mov_order_ref.html" import admin_mov_order_ref %}
+
+{% block title %}{{ product.nome }} — Minhas Vendas — Vendedor | Go Sell{% endblock %}
+
+{% block seller_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-product-page.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-movements-table.css') }}">
+{% endblock %}
+
+{#
+    Mesmo visual da página do produto no admin (static/css/admin-product-page.css,
+    .admin-prodv) e do histórico de movimentações (admin-movements-table.css,
+    .admin-movv), na variante somente leitura do vendedor (.admin-movv--seller).
+#}
+{% block seller_body %}
+{% if seller_event %}
+<div class="seller-event-banner">
+    <i class="fa-solid fa-calendar-star" aria-hidden="true"></i>
+    <span>Suas vendas no evento <strong>{{ seller_event.name }}</strong>. Visualização somente leitura.</span>
+</div>
+{% endif %}
+
+{% set name_key = ((product.nome or '')|lower).split()|join(' ') %}
+{% set stock_n = product.estoque or 0 %}
+{% set min_n = product.estoque_minimo or 0 %}
+<section class="admin-section admin-prodv">
+    {# ---------- Identidade do produto ---------- #}
+    <article class="admin-prodv__hero">
+        <div class="admin-prodv__image">
+            {% if product.imagem %}
+            <img class="admin-stock__thumb admin-prodv__img" src="{{ product.imagem }}" alt="{{ product.nome }}"
+                 data-lightbox-label="{{ product.nome }}" onerror="this.style.visibility='hidden'">
+            {% endif %}
+        </div>
+
+        <div class="admin-prodv__identity">
+            <p class="admin-prodv__eyebrow">
+                {% if seller_event %}
+                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                Suas vendas no evento <strong>{{ seller_event.name }}</strong>
+                {% else %}
+                <i class="fa-solid fa-chart-line" aria-hidden="true"></i>
+                Suas vendas deste produto
+                {% endif %}
+            </p>
+            <h1 class="admin-prodv__title">{{ product.nome }}</h1>
+            {% if product.variante and ((product.variante|lower).split()|join(' ')) != name_key %}
+            <p class="admin-prodv__variant">{{ product.variante }}</p>
+            {% endif %}
+            <ul class="admin-prodv__chips">
+                <li class="admin-prodv__chip admin-prodv__chip--code">SKU <code>{{ product.sku or '—' }}</code></li>
+                <li class="admin-prodv__chip">ID {{ product.id }}</li>
+                {% if product.categoria %}<li class="admin-prodv__chip"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>{{ product.categoria }}</li>{% endif %}
+            </ul>
+        </div>
+
+        <div class="admin-prodv__flags">
+            <div class="admin-product__status admin-prodv__status">
+                {% if not product.ativo %}
+                    <span class="admin-badge admin-badge--neutral">Inativo</span>
+                {% elif stock_n <= 0 %}
+                    <span class="admin-badge admin-badge--danger">Sem estoque</span>
+                {% elif min_n > 0 and stock_n < min_n %}
+                    <span class="admin-badge admin-badge--warn">Abaixo do mínimo</span>
+                {% else %}
+                    <span class="admin-badge admin-badge--success">OK</span>
+                {% endif %}
+            </div>
+            {% if seller_event %}
+            {% include 'partials/product_promo_name_badge.html' %}
+            {% endif %}
+        </div>
+    </article>
+
+    {# ---------- Indicadores ---------- #}
+    <dl class="admin-prodv__stats">
+        <div class="admin-prodv__stat admin-prodv__stat--stock">
+            <dt><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>{% if seller_event %}Estoque no evento{% else %}Estoque total{% endif %}</dt>
+            <dd><strong>{{ stock_n }}</strong> un.</dd>
+        </div>
+        {% if seller_event %}
+        <div class="admin-prodv__stat">
+            <dt><i class="fa-solid fa-arrow-down-short-wide" aria-hidden="true"></i>Estoque mínimo</dt>
+            <dd>{{ min_n }} un.</dd>
+        </div>
+        {% endif %}
+        <div class="admin-prodv__stat">
+            <dt><i class="fa-solid fa-tag" aria-hidden="true"></i>{% if seller_event %}Preço no evento{% else %}Preço de lista{% endif %}</dt>
+            <dd>{{ product.preco | brl }}</dd>
+        </div>
+    </dl>
+</section>
+
+<section class="admin-section admin-prodv admin-prodv--history" id="seller-product-sales">
+    <header class="admin-prodv__section-head">
+        <div>
+            <h2 class="admin-prodv__heading admin-prodv__heading--lg">
+                <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                Minhas vendas deste produto
+            </h2>
+            <p class="admin-prodv__section-sub" data-filter-region="resumo">
+                {% if pagination.total > 0 %}
+                    Mostrando {{ pagination.showing_from }}–{{ pagination.showing_to }} de {{ pagination.total }} venda{% if pagination.total != 1 %}s{% endif %}.
+                {% else %}
+                    Nenhuma venda{% if filters.pedido %} para os filtros aplicados{% endif %}.
+                {% endif %}
+                Visualização somente leitura.
+            </p>
+        </div>
+    </header>
+
+    <form class="admin-filters" method="get"
+          action="{{ url_for('seller_stock_product', product_id=product.id) }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter admin-filter--wide">
+            <span class="admin-filter__label">Código do pedido</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-receipt admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="pedido"
+                    value="{{ filters.pedido }}"
+                    class="admin-filter__input"
+                    placeholder="Código do pedido ou nome do cliente…"
+                    autocomplete="off"
+                    inputmode="search"
+                    aria-describedby="hint-filtro-pedido-seller-product"
+                >
+            </span>
+            <span id="hint-filtro-pedido-seller-product" class="admin-filter__hint">
+                Busca pelo número do pedido (ex.: OM260422-1234) ou pelo nome do cliente.
+            </span>
+        </label>
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('seller_stock_product', product_id=product.id) }}"
+               class="admin-btn admin-btn--ghost">Limpar</a>
+        </div>
+    </form>
+
+    <div id="lista" data-filter-region="tabela"
+         class="admin-table admin-movv admin-movv--seller{% if not seller_event %} admin-movv--seller-events{% endif %}"
+         role="table" aria-label="Minhas vendas do produto">
+        <div class="admin-table__head admin-mov__row" role="row">
+            <span role="columnheader">Data/Hora</span>
+            <span role="columnheader">Tipo</span>
+            <span role="columnheader" class="admin-table__col--num">Quantidade</span>
+            <span role="columnheader" class="admin-table__col--num">Saldo após</span>
+            <span role="columnheader">Ref. / Pedido</span>
+            {% if not seller_event %}
+            <span role="columnheader">Evento</span>
+            {% endif %}
+        </div>
+
+        {% if movements %}
+            {% for m in movements %}
+            {% set mov_type = m.movement_type or 'venda' %}
+            <div class="admin-mov__wrapper" data-movement-id="{{ m.id }}"
+                 {% if m.is_pending_delivery or mov_type == 'pendente' %}data-pending-delivery{% endif %}>
+                <div class="admin-mov__row" role="row">
+                    <span>{{ m.created_at | datahora }}</span>
+                    <span class="admin-mov__type-cell">
+                        <span class="admin-badge admin-mov__badge admin-mov__badge--{{ mov_type }}">
+                            {{ mov_type | movlabel }}
+                        </span>
+                    </span>
+                    <span class="admin-table__col--num admin-mov__delta admin-mov__delta--{% if (m.delta or 0) > 0 %}positive{% elif (m.delta or 0) < 0 %}negative{% else %}neutral{% endif %}">
+                        {{ m.delta | signed }}
+                    </span>
+                    <span class="admin-table__col--num"><strong>{{ m.balance_after }}</strong></span>
+                    <span class="admin-mov__reason">
+                        {% if m.reference and m.transaction_id %}
+                        {% set tx_url = url_for('seller_dashboard', pedido=m.reference) ~ '#tx-' ~ m.transaction_id %}
+                        {% else %}
+                        {% set tx_url = None %}
+                        {% endif %}
+                        {{ admin_mov_order_ref(m.reference, tx_url) }}
+                        {{ m.reason or '-' }}
+                    </span>
+                    {% if not seller_event %}
+                    <span class="admin-mov__event-cell">
+                        {% if m.event_id and m.event_name %}
+                            {% set row_ev_style = m.event_badge_color | event_badge_style %}
+                            <span class="admin-nav__event-badge admin-mov__event-badge" title="Evento #{{ m.event_id }}"{% if row_ev_style %} style="{{ row_ev_style }}"{% endif %}>
+                                {{ m.event_name }}
+                            </span>
+                        {% elif m.event_id %}
+                            <span class="admin-mov__event-unknown" title="Evento #{{ m.event_id }} (cadastro indisponível)">#{{ m.event_id }}</span>
+                        {% else %}
+                            <span class="admin-mov__event-none" title="Venda no catálogo global (sem evento)">—</span>
+                        {% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>
+                    {% if filters.pedido %}
+                        Nenhuma venda encontrada para os filtros aplicados.
+                    {% else %}
+                        Você ainda não vendeu este produto{% if seller_event %} neste evento{% endif %}.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="admin-filter-region" data-filter-region="paginacao">
+    {% if pagination.total > 0 %}
+    <nav class="admin-pagination" aria-label="Paginação das vendas">
+        <p class="admin-pagination__summary">
+            Mostrando
+            <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+            de <strong>{{ pagination.total }}</strong> venda{% if pagination.total != 1 %}s{% endif %}
+            · página {{ pagination.page }} de {{ pagination.total_pages }}
+        </p>
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('seller_stock_product', product_id=product.id, pedido=filters.pedido, page=pagination.page - 1) }}#seller-product-sales"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('seller_stock_product', product_id=product.id, pedido=filters.pedido, page=pagination.page + 1) }}#seller-product-sales"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    </div>
+</section>
+{% endblock %}

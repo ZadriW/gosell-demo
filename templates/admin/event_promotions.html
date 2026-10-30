@@ -1,0 +1,355 @@
+{% extends "admin/_layout.html" %}
+{% from "macros/promo_rule.html" import promo_rule_text, promo_rule_icon, gift_rule_text, gift_rule_icon %}
+
+{#
+    Promoções do evento. A chave Descontos/Brindes (``?modo=brindes``) troca a
+    página inteira: cabeçalho, botões, busca e lista. Descontos mudam o preço
+    dos itens; brindes acrescentam um produto a R$ 0,00 ao pedido.
+#}
+
+{% set gifts_mode = mode == 'brindes' %}
+
+{% block title %}{{ 'Brindes' if gifts_mode else 'Promoções' }} — {{ event.name }} | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-promos.css') }}">
+{% endblock %}
+
+{% macro search_toolbar(items, placeholder, noun, fem=false) %}
+{% set o = 'a' if fem else 'o' %}
+{% set n_on = items|selectattr('active')|list|length %}
+<div class="promo-toolbar">
+    <label class="promo-search">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" data-promo-list-search placeholder="{{ placeholder }}"
+               autocomplete="off" spellcheck="false" aria-label="Buscar {{ noun }}">
+    </label>
+    <div class="promo-segmented" role="group" aria-label="Filtrar por situação">
+        <button type="button" class="is-active" data-promo-list-filter="all">Tod{{ o }}s <span>{{ items|length }}</span></button>
+        <button type="button" data-promo-list-filter="active">Ativ{{ o }}s <span>{{ n_on }}</span></button>
+        <button type="button" data-promo-list-filter="inactive">Inativ{{ o }}s <span>{{ items|length - n_on }}</span></button>
+    </div>
+</div>
+{% endmacro %}
+
+{% macro toggle_form(action, active, noun) %}
+<form method="post" action="{{ action }}">
+    {% include 'partials/csrf_field.html' %}
+    <button type="submit" class="promo-switch" role="switch" aria-checked="{{ 'true' if active else 'false' }}"
+            title="{{ 'Desativar' if active else 'Ativar' }} {{ noun }}">
+        <span class="promo-switch__track" aria-hidden="true"><span class="promo-switch__knob"></span></span>
+        <span class="promo-switch__label">{{ 'Ativo' if active else 'Inativo' }}</span>
+    </button>
+</form>
+{% endmacro %}
+
+{% macro product_strip(products) %}
+{% if products %}
+<div class="promo-card__products">
+    <span class="promo-thumbs" aria-hidden="true">
+        {% for prod in products[:4] %}
+        {% set img = product_images.get(prod.product_id) %}
+        <span class="promo-thumb">{% if img %}<img src="{{ img }}" alt="" loading="lazy">{% else %}<i class="fa-solid fa-box-open"></i>{% endif %}</span>
+        {% endfor %}
+    </span>
+    <span class="promo-card__product-text">
+        <strong>{{ products|length }} produto{{ '' if products|length == 1 else 's' }}</strong>
+        <span>{{ products|map(attribute='name')|list|join(' · ') }}</span>
+    </span>
+</div>
+{% else %}
+<p class="promo-card__warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> Sem produtos: não vale para nenhuma venda.</p>
+{% endif %}
+{% endmacro %}
+
+{% block admin_body %}
+{% set op_noun_l = event|op_noun(lower=True) %}
+{% set ops_open = event_ops_open(event) %}
+{% set n_active = promotions|selectattr('active')|list|length %}
+{% set n_gifts_active = gift_rules|selectattr('active')|list|length %}
+<section class="admin-section promo-page{% if gifts_mode %} promo-page--gifts{% endif %}" data-promo-list-page>
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">{{ 'Brindes' if gifts_mode else 'Promoções' }}</h1>
+            <p class="admin-section__subtitle">
+                {% if gifts_mode %}
+                    {% if gift_rules %}
+                    {{ gift_rules|length }} brinde(s) · {{ n_gifts_active }} ativo(s) neste {{ op_noun_l }}
+                    {% else %}
+                    Produtos que entram de graça no pedido quando a compra atinge a regra.
+                    {% endif %}
+                {% else %}
+                    {% if promotions %}
+                    {{ promotions|length }} promoção(ões) · {{ n_active }} ativa(s) neste {{ op_noun_l }}
+                    {% else %}
+                    Regras de preço aplicadas automaticamente no carrinho deste {{ op_noun_l }}.
+                    {% endif %}
+                {% endif %}
+            </p>
+        </div>
+        <div class="promo-page__actions">
+            {% if not gifts_mode and promotions %}
+            <a class="admin-btn admin-btn--ghost"
+               href="{{ url_for('admin_event_promotions_export_xlsx', event_id=event.id) }}">
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i> Exportar planilha
+            </a>
+            {% endif %}
+            {% if ops_open %}
+                {% if gifts_mode %}
+                <a class="admin-btn admin-btn--primary" href="{{ url_for('admin_event_gift_new', event_id=event.id) }}">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> Novo brinde
+                </a>
+                {% else %}
+                <a class="admin-btn admin-btn--primary" href="{{ url_for('admin_event_promotion_new', event_id=event.id) }}">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i> Nova promoção
+                </a>
+                {% endif %}
+            {% endif %}
+        </div>
+    </header>
+
+    {# Chave Descontos / Brindes: links, para a escolha ficar no endereço. #}
+    <nav class="promo-mode" data-mode="{{ mode }}" aria-label="Tipo de promoção">
+        <a class="promo-mode__opt" href="{{ url_for('admin_event_promotions', event_id=event.id) }}"
+           {% if not gifts_mode %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+            <span class="promo-mode__text"><strong>Descontos</strong><small>Mudam o preço dos itens</small></span>
+            <span class="promo-mode__count">{{ promotions|length }}</span>
+        </a>
+        <a class="promo-mode__opt" href="{{ url_for('admin_event_promotions', event_id=event.id, modo='brindes') }}"
+           {% if gifts_mode %}aria-current="page"{% endif %}>
+            <i class="fa-solid fa-gift" aria-hidden="true"></i>
+            <span class="promo-mode__text"><strong>Brindes</strong><small>Item grátis no pedido</small></span>
+            <span class="promo-mode__count">{{ gift_rules|length }}</span>
+        </a>
+    </nav>
+
+    {% if gifts_mode %}
+    {# ============================== BRINDES ============================== #}
+    {% if gift_rules %}
+    {{ search_toolbar(gift_rules, 'Buscar por brinde, produto ou SKU', 'brindes') }}
+
+    <ul class="promo-list">
+        {% for rule in gift_rules %}
+        {% set detail_url = url_for('admin_event_gift_detail', event_id=event.id, rule_id=rule.id) %}
+        <li class="promo-card promo-card--gift{% if not rule.active %} is-inactive{% endif %}" id="brinde-{{ rule.id }}"
+            data-promo-item data-active="{{ '1' if rule.active else '0' }}"
+            data-search="{{ ([rule.name, rule.gift_name or '', rule.gift_sku or ''] + rule.products|map(attribute='name')|list + rule.products|map(attribute='sku')|list)|join(' ')|lower }}">
+            <a class="promo-card__icon gift-type--{{ rule.rule_type }}" href="{{ detail_url }}" tabindex="-1" aria-hidden="true">
+                <i class="fa-solid {{ gift_rule_icon(rule.rule_type) }}"></i>
+            </a>
+            <div class="promo-card__main">
+                <a class="promo-card__name" href="{{ detail_url }}">{{ rule.name }}</a>
+                <p class="promo-card__rule">{{ gift_rule_text(rule) }}</p>
+                <div class="gift-chips">
+                {% for g in rule.gifts %}
+                {% set g_img = (product_images.get(g.product_id) or g.image) if g.kind == 'produto' else '' %}
+                <div class="gift-chip{% if g.kind == 'avulso' %} gift-chip--avulso{% endif %}">
+                    <span class="promo-thumb">{% if g_img %}<img src="{{ g_img }}" alt="" loading="lazy">{% else %}<i class="fa-solid fa-gift" aria-hidden="true"></i>{% endif %}</span>
+                    <span class="gift-chip__text">
+                        <small>{{ 'Brinde avulso' if g.kind == 'avulso' else 'Brinde' }}</small>
+                        <strong>{{ rule.gift_qty }}× {{ g.name }}</strong>
+                    </span>
+                    {% if g.sku %}<code class="gift-chip__sku">{{ g.sku }}</code>{% endif %}
+                    {% if g.kind == 'avulso' and g.available is not none %}
+                    <span class="gift-chip__stock{% if g.available == 0 %} is-out{% endif %}">{{ g.available }} restante{{ '' if g.available == 1 else 's' }}</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                </div>
+                {% if rule.rule_type == 'min_total' and not rule.products %}
+                <p class="promo-card__scope"><i class="fa-solid fa-receipt" aria-hidden="true"></i> Vale para o valor do pedido inteiro.</p>
+                {% else %}
+                {{ product_strip(rule.products) }}
+                {% endif %}
+            </div>
+            <div class="promo-card__side">
+                {% if ops_open %}
+                {{ toggle_form(url_for('admin_event_gift_toggle', event_id=event.id, rule_id=rule.id), rule.active, 'brinde') }}
+                {% else %}
+                <span class="admin-badge {{ 'admin-badge--success' if rule.active else 'admin-badge--neutral' }}">{{ 'Ativo' if rule.active else 'Inativo' }}</span>
+                {% endif %}
+                <div class="promo-card__buttons">
+                    <a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ detail_url }}">
+                        <i class="fa-solid {{ 'fa-pen' if ops_open else 'fa-eye' }}" aria-hidden="true"></i> {{ 'Editar' if ops_open else 'Ver' }}
+                    </a>
+                    {% if ops_open %}
+                    <form method="post" action="{{ url_for('admin_event_gift_delete', event_id=event.id, rule_id=rule.id) }}"
+                          data-confirm="Excluir o brinde «{{ rule.name }}»? Vendas já feitas mantêm o brinde que ganharam."
+                          data-confirm-title="Excluir brinde" data-confirm-label="Excluir">
+                        {% include 'partials/csrf_field.html' %}
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm promo-card__delete" title="Excluir brinde" aria-label="Excluir brinde {{ rule.name }}">
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="promo-list__none" data-promo-list-none hidden>
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Nenhum brinde com esse filtro.
+    </p>
+    {% else %}
+    <div class="promo-empty">
+        <span class="promo-empty__icon promo-empty__icon--gift"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>
+        <h2>Nenhum brinde ainda</h2>
+        <p>Escolha o brinde (um produto do estoque ou um brinde avulso cadastrado abaixo) e diga quando ele sai: "a partir de 3 unidades", "a cada kit de 5 de um item" ou "pedidos a partir de R$ 1.000". O brinde entra sozinho no pedido, a R$ 0,00.</p>
+        {% if ops_open %}
+        <a class="admin-btn admin-btn--primary" href="{{ url_for('admin_event_gift_new', event_id=event.id) }}">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> Criar o primeiro brinde
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ------------------------- Brindes avulsos ------------------------- #}
+    <section class="gift-items" id="avulsos" aria-labelledby="giftItemsTitle">
+        <header class="gift-items__head">
+            <div>
+                <h2 class="gift-items__title" id="giftItemsTitle"><i class="fa-solid fa-box-open" aria-hidden="true"></i> Brindes avulsos</h2>
+                <p class="gift-items__hint">Itens que não são produtos nem existem no ERP (canecas, squeezes, chaveiros...). Cadastre aqui e escolha-os como brinde nas regras. Saem do pedido a R$ 0,00 e vão ao ERP só como observação interna.</p>
+            </div>
+        </header>
+
+        {% if ops_open %}
+        <form method="post" class="gift-items__new" action="{{ url_for('admin_event_gift_item_create', event_id=event.id) }}">
+            {% include 'partials/csrf_field.html' %}
+            <label class="gift-items__field gift-items__field--name">
+                <span>Nome do brinde avulso</span>
+                <input type="text" name="name" class="admin-field__input" maxlength="120" required placeholder="Ex.: Caneca Go Sell">
+            </label>
+            <label class="gift-items__field">
+                <span>Quantidade disponível</span>
+                <input type="number" name="stock" class="admin-field__input" min="0" step="1" inputmode="numeric" placeholder="Sem limite">
+            </label>
+            <button type="submit" class="admin-btn admin-btn--primary"><i class="fa-solid fa-plus" aria-hidden="true"></i> Cadastrar</button>
+        </form>
+        {% endif %}
+
+        {% if gift_items %}
+        <ul class="gift-items__list">
+            {% for item in gift_items %}
+            <li class="gift-item" id="avulso-{{ item.id }}">
+                <span class="gift-item__icon" aria-hidden="true"><i class="fa-solid fa-gift"></i></span>
+                <div class="gift-item__main">
+                    <strong class="gift-item__name">{{ item.name }}</strong>
+                    <span class="gift-item__meta">
+                        {% if item.stock is none %}
+                        <span class="gift-item__pill">Sem limite</span>
+                        {% else %}
+                        <span class="gift-item__pill{% if item.available == 0 %} is-out{% endif %}">{{ item.available }} de {{ item.stock }} disponíve{{ 'l' if item.stock == 1 else 'is' }}</span>
+                        {% endif %}
+                        <span>{{ item.used }} entregue{{ '' if item.used == 1 else 's' }}</span>
+                        <span>· {{ item.rules_count }} regra{{ '' if item.rules_count == 1 else 's' }}</span>
+                    </span>
+                </div>
+                {% if ops_open %}
+                <details class="gift-item__edit">
+                    <summary class="admin-btn admin-btn--ghost admin-btn--sm"><i class="fa-solid fa-pen" aria-hidden="true"></i> Editar</summary>
+                    <form method="post" class="gift-items__new gift-items__new--edit" action="{{ url_for('admin_event_gift_item_edit', event_id=event.id, item_id=item.id) }}">
+                        {% include 'partials/csrf_field.html' %}
+                        <label class="gift-items__field gift-items__field--name">
+                            <span>Nome</span>
+                            <input type="text" name="name" class="admin-field__input" maxlength="120" required value="{{ item.name }}">
+                        </label>
+                        <label class="gift-items__field">
+                            <span>Quantidade total</span>
+                            <input type="number" name="stock" class="admin-field__input" min="0" step="1" inputmode="numeric" placeholder="Sem limite" value="{{ item.stock if item.stock is not none else '' }}">
+                        </label>
+                        <button type="submit" class="admin-btn admin-btn--primary admin-btn--sm"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i> Salvar</button>
+                    </form>
+                </details>
+                <form method="post" action="{{ url_for('admin_event_gift_item_delete', event_id=event.id, item_id=item.id) }}"
+                      data-confirm="Excluir o brinde avulso «{{ item.name }}»? Vendas já feitas continuam com ele."
+                      data-confirm-title="Excluir brinde avulso" data-confirm-label="Excluir">
+                    {% include 'partials/csrf_field.html' %}
+                    <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm promo-card__delete" aria-label="Excluir brinde avulso {{ item.name }}"
+                            title="{{ ('Em uso em ' ~ item.rules_count ~ ' regra(s): troque o brinde delas antes') if item.rules_count else 'Excluir' }}"
+                            {% if item.rules_count %}disabled{% endif %}>
+                        <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                    </button>
+                </form>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="gift-items__empty">Nenhum brinde avulso cadastrado.</p>
+        {% endif %}
+    </section>
+
+    {% else %}
+    {# ============================== DESCONTOS ============================== #}
+    {% if promotions %}
+    {{ search_toolbar(promotions, 'Buscar por promoção, produto ou SKU', 'promoções', fem=true) }}
+
+    <ul class="promo-list">
+        {% for promo in promotions %}
+        {% set detail_url = url_for('admin_event_promotion_detail', event_id=event.id, promo_id=promo.id) %}
+        <li class="promo-card{% if not promo.active %} is-inactive{% endif %}" id="promo-{{ promo.id }}"
+            data-promo-item data-active="{{ '1' if promo.active else '0' }}"
+            data-search="{{ ([promo.name] + promo.products|map(attribute='name')|list + promo.products|map(attribute='sku')|list)|join(' ')|lower }}">
+            <a class="promo-card__icon promo-type--{{ promo.rule_type }}" href="{{ detail_url }}" tabindex="-1" aria-hidden="true">
+                <i class="fa-solid {{ promo_rule_icon(promo.rule_type) }}"></i>
+            </a>
+            <div class="promo-card__main">
+                <a class="promo-card__name" href="{{ detail_url }}">{{ promo.name }}</a>
+                <p class="promo-card__rule">{{ promo_rule_text(promo) }}</p>
+                {{ product_strip(promo.products) }}
+            </div>
+            <div class="promo-card__side">
+                {% if ops_open %}
+                <form method="post" action="{{ url_for('admin_event_promotion_toggle', event_id=event.id, promo_id=promo.id) }}">
+                    {% include 'partials/csrf_field.html' %}
+                    <button type="submit" class="promo-switch" role="switch" aria-checked="{{ 'true' if promo.active else 'false' }}"
+                            title="{{ 'Desativar' if promo.active else 'Ativar' }} promoção">
+                        <span class="promo-switch__track" aria-hidden="true"><span class="promo-switch__knob"></span></span>
+                        <span class="promo-switch__label">{{ 'Ativa' if promo.active else 'Inativa' }}</span>
+                    </button>
+                </form>
+                {% else %}
+                <span class="admin-badge {{ 'admin-badge--success' if promo.active else 'admin-badge--neutral' }}">{{ 'Ativa' if promo.active else 'Inativa' }}</span>
+                {% endif %}
+                <div class="promo-card__buttons">
+                    <a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ detail_url }}">
+                        <i class="fa-solid {{ 'fa-pen' if ops_open else 'fa-eye' }}" aria-hidden="true"></i> {{ 'Editar' if ops_open else 'Ver' }}
+                    </a>
+                    {% if ops_open %}
+                    <form method="post" action="{{ url_for('admin_event_promotion_delete', event_id=event.id, promo_id=promo.id) }}"
+                          data-confirm="Excluir a promoção «{{ promo.name }}»? Esta ação não pode ser desfeita."
+                          data-confirm-title="Excluir promoção" data-confirm-label="Excluir">
+                        {% include 'partials/csrf_field.html' %}
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm promo-card__delete" title="Excluir promoção" aria-label="Excluir promoção {{ promo.name }}">
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+    <p class="promo-list__none" data-promo-list-none hidden>
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> Nenhuma promoção com esse filtro.
+    </p>
+    {% else %}
+    <div class="promo-empty">
+        <span class="promo-empty__icon"><i class="fa-solid fa-tags" aria-hidden="true"></i></span>
+        <h2>Nenhuma promoção ainda</h2>
+        <p>Crie kits, combos, descontos ou "compre e leve" para os produtos deste {{ op_noun_l }}. O desconto entra sozinho no carrinho.</p>
+        {% if ops_open %}
+        <a class="admin-btn admin-btn--primary" href="{{ url_for('admin_event_promotion_new', event_id=event.id) }}">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i> Criar a primeira promoção
+        </a>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-promo-list.js') }}"></script>
+{% endblock %}

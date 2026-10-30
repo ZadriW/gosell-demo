@@ -1,0 +1,38 @@
+{# Bootstrap do modo escuro antes do paint — escopo por login (admin vs vendedor). #}
+{% if totem_theme_scope %}
+<script type="application/json" id="totem-theme-boot">{{ totem_theme_scope | tojson }}</script>
+<script>
+(function () {
+    var el = document.getElementById('totem-theme-boot');
+    var scope = '';
+    try {
+        scope = JSON.parse((el && el.textContent) || '""');
+    } catch (e) { return; }
+    window.__TOTEM_THEME_SCOPE__ = scope;
+    try {
+        var key = 'totem-theme:' + scope;
+        var theme = localStorage.getItem(key);
+        if (theme === null && scope.indexOf('admin:') === 0) {
+            var legacy = localStorage.getItem('totem-admin-theme');
+            if (legacy === 'dark' || legacy === 'light') {
+                theme = legacy;
+                localStorage.setItem(key, theme);
+            }
+        }
+        if (theme === 'dark') {
+            document.documentElement.classList.add('admin-theme--dark');
+        }
+    } catch (e) { /* ignore */ }
+    try {
+        if ('scrollRestoration' in history) {
+            var raw = sessionStorage.getItem('totem-admin-view-state');
+            if (raw) {
+                var st = JSON.parse(raw);
+                var key = location.pathname + location.search;
+                if (st && st.key === key) history.scrollRestoration = 'manual';
+            }
+        }
+    } catch (e) { /* ignore */ }
+})();
+</script>
+{% endif %}

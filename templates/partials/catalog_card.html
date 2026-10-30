@@ -1,0 +1,161 @@
+{# Card de produto do catálogo. Espera ``product``; renderizado na página e
+   pelo polling do catálogo quando o administrador adiciona produtos ao evento. #}
+{% set sm = (product.estoque_minimo | default(5)) | int %}
+{% set tem_opcoes = product.tem_opcoes | default(false) %}
+{% set q = (product.estoque_opcoes if tem_opcoes else product.estoque) | int %}
+{% if q <= 0 %}
+    {% set stock_tone = 'empty' %}
+{% elif sm > 0 and q < sm %}
+    {% set stock_tone = 'low' %}
+{% else %}
+    {% set stock_tone = 'ok' %}
+{% endif %}
+{# Card de família: o selo é o de alguma opção promovida (campos ``opcoes_*``);
+   os campos do próprio produto valem só para ele como variante. #}
+{% set em_promo = (product.opcoes_em_promocao if tem_opcoes else product.em_promocao) | default(false) %}
+{% set promo_badge = product.opcoes_promo_badge if tem_opcoes else product.promo_badge %}
+{% set pending_n = product.pending_delivery_units or 0 %}
+{% set bl = product.backorder_limit | default(-1) | int %}
+{# Família pelo molde do nome (ERP): título sem o trecho que varia entre as opções. #}
+{% set card_title = product.nome_familia or product.nome %}
+{% set backorder_blocked = (not tem_opcoes) and bl == 0 and q <= 0 %}
+<article
+    class="product-card{% if em_promo %} product-card--promo{% endif %}{% if backorder_blocked %} product-card--backorder-blocked{% endif %}"
+    data-id="{{ product.id }}"
+    data-category="{{ product.categoria }}"
+    data-name="{{ product.nome|lower }}"
+    data-variante="{{ (product.variante or '')|lower }}"
+    data-sku="{{ (product.sku or '')|lower }}"
+    data-busca="{{ (product.busca_opcoes or '')|lower }}"
+    data-estoque="{{ q }}"
+    data-estoque-min="{{ sm }}"
+    data-preco="{{ product.preco_a_partir if tem_opcoes else product.preco }}"
+    data-backorder-limit="{{ bl }}"
+    {% if tem_opcoes %}data-tem-opcoes="1" data-opcoes="{{ (product.opcoes or [])|join(',') }}"{% endif %}
+>
+    <div class="product-card__image{% if not product.imagem %} product-card__image--empty{% endif %}">
+        <div class="product-card__promo-badge-slot" data-promo-badge-root>
+            {% if em_promo and promo_badge %}
+            <div class="product-card__promo-badge">
+                <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                {{ promo_badge }}
+            </div>
+            {% endif %}
+        </div>
+        <div class="product-card__delivery-badge-slot" data-delivery-badge-root>
+            {% if pending_n > 0 %}
+            <div class="product-card__delivery-badge"
+                 title="{{ pending_n }} un. aguardando retirada">
+                <span class="admin-badge admin-badge--warn admin-tx__delivery-badge" aria-label="Retirada pendente">
+                    <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                </span>
+                <span class="admin-stock__delivery-count">{{ pending_n }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {# Sem foto (ou foto que falha ao carregar, tratada no catalog.js): o
+           quadro mantém o tamanho e mostra o ícone, sem quebrar o grid. #}
+        {% if product.imagem %}
+        {# Miniatura WebP leve; se ela falhar, o catalog.js tenta a foto original. #}
+        {% set card_img = product.imagem_card or product.imagem %}
+        <img src="{{ card_img }}" alt="{{ card_title }}" loading="lazy" decoding="async"
+             {% if card_img != product.imagem %}data-full-src="{{ product.imagem }}"{% endif %}>
+        {% endif %}
+        <div class="product-card__image-fallback" aria-hidden="true">
+            <i class="fa-regular fa-image"></i>
+        </div>
+    </div>
+    <div class="product-card__body">
+        <span class="product-card__category">{{ product.categoria }}</span>
+        <h2 class="product-card__name">{{ card_title }}</h2>
+        {% if not tem_opcoes and product.variante %}<p class="product-card__variant">{{ product.variante }}</p>{% endif %}
+        {% if product.subtitle %}<p class="product-card__subtitle">{{ product.subtitle }}</p>{% endif %}
+        {% if tem_opcoes %}
+        <div class="product-card__meta-line">
+            <span class="product-card__sku">{{ product.opcoes_count or (product.opcoes|length) }} opções</span>
+            <span class="product-card__stock product-card__stock--{{ stock_tone }}" data-stock-display>{{ q }} no estoque.</span>
+        </div>
+        {% elif product.sku %}
+        <div class="product-card__meta-line">
+            <span class="product-card__sku">SKU {{ product.sku }}</span>
+            <span class="product-card__stock product-card__stock--{{ stock_tone }}" data-stock-display>{{ product.estoque }} no estoque.</span>
+        </div>
+        {% else %}
+        <span class="product-card__stock product-card__stock--{{ stock_tone }} product-card__stock--alone" data-stock-display>{{ product.estoque }} no estoque.</span>
+        {% endif %}
+        {% if not tem_opcoes %}
+        <span class="product-card__backorder-info{% if bl == 0 %} product-card__backorder-info--blocked{% endif %}" data-backorder-info
+              {% if bl < 0 %}hidden{% endif %}>
+            <i class="fa-solid {% if bl == 0 %}fa-ban{% else %}fa-truck-clock{% endif %}" aria-hidden="true"></i>
+            <span data-backorder-msg>
+                {% if bl == 0 %}
+                Vendas futuras bloqueadas
+                {% else %}
+                <span data-backorder-limit-value>{{ bl }}</span> vendas futuras disp.
+                {% endif %}
+            </span>
+        </span>
+        {% endif %}
+        <div data-catalog-pricing>
+            {% if tem_opcoes %}
+            <div class="product-card__price-wrap">
+                {% if product.precos_opcoes_variam %}
+                <span class="product-card__price-from">A partir de</span>
+                {% endif %}
+                <p class="product-card__price">{{ (product.preco_a_partir or product.preco) | brl }}</p>
+            </div>
+            {% else %}
+            {% set promo_tipo = product.promo_tipo | default('') %}
+            {% if em_promo and promo_tipo in ('percent', 'fixed') and product.preco_original is defined and product.preco_original > product.preco + 0.001 %}
+            {# percent / fixed: preço unitário efetivamente reduzido — exibe riscado + novo #}
+            <div class="product-card__price-wrap">
+                <span class="product-card__price-original">{{ product.preco_original | brl }}</span>
+                <p class="product-card__price product-card__price--promo">{{ product.preco | brl }}</p>
+                {% if product.promo_nome %}<span class="product-card__promo-name">{{ product.promo_nome }}</span>{% endif %}
+            </div>
+            {% elif em_promo and (promo_tipo in ('bogo', 'min_bundle', 'exact_bundle', 'combo_bundle') or product.promo_nome) %}
+            {# Desconto por quantidade (ou várias regras): preço de lista + nomes das promos #}
+            <div class="product-card__price-wrap">
+                <p class="product-card__price">{{ product.preco | brl }}</p>
+                {% if product.promo_nome %}<span class="product-card__promo-name">{{ product.promo_nome }}</span>{% endif %}
+            </div>
+            {% else %}
+            <p class="product-card__price">{{ product.preco | brl }}</p>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+    <div class="product-card__actions">
+        {% if tem_opcoes %}
+        <button
+            class="product-card__options-btn"
+            type="button"
+            data-open-options="{{ product.id }}"
+            aria-label="Ver opções de {{ card_title }}"
+        >
+            Ver Opções
+        </button>
+        {% else %}
+        <div class="product-card__counter" role="group" aria-label="Quantidade">
+            <button type="button" class="product-card__counter-btn" data-action="dec" aria-label="Diminuir quantidade">
+                <span aria-hidden="true">&minus;</span>
+            </button>
+            <input
+                class="product-card__counter-input"
+                type="number"
+                min="1"
+                max="{{ product.estoque }}"
+                value="1"
+                inputmode="numeric"
+                aria-label="Quantidade a adicionar"
+            >
+            <button type="button" class="product-card__counter-btn" data-action="inc" aria-label="Aumentar quantidade">
+                <span aria-hidden="true">+</span>
+            </button>
+        </div>
+        <button class="product-card__button" type="button" data-id="{{ product.id }}" aria-label="Adicionar ao carrinho"{% if backorder_blocked %} disabled{% endif %}>
+            <i class="fa-solid fa-cart-plus" aria-hidden="true"></i>
+        </button>
+        {% endif %}
+    </div>
+</article>

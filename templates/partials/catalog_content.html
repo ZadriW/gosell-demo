@@ -1,0 +1,199 @@
+{# Conteúdo do catálogo (topbar + grid + carrinho). Requer: products, catalog_brand_href, catalog_brand_aria #}
+{% from "macros/admin_brand_logo.html" import admin_brand_logo %}
+<header class="topbar">
+    <a class="topbar__brand" href="{{ catalog_brand_href }}" aria-label="{{ catalog_brand_aria }}">
+        {{ admin_brand_logo() }}
+    </a>
+
+    <div class="topbar__search">
+        <svg class="topbar__search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input
+            id="searchInput"
+            type="search"
+            placeholder="Buscar produto..."
+            autocomplete="off"
+        >
+    </div>
+
+    <button
+        class="topbar__cart"
+        type="button"
+        id="openCartBtn"
+        aria-label="Abrir carrinho"
+        {% if catalog_readonly %}hidden{% endif %}
+    >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1"></circle>
+            <circle cx="20" cy="21" r="1"></circle>
+            <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"></path>
+        </svg>
+        <span class="topbar__cart-count" id="cartCount">0</span>
+    </button>
+</header>
+
+<div
+    id="catalogAddToast"
+    class="catalog-toast"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+    aria-hidden="true"
+>
+    <span class="catalog-toast__icon" aria-hidden="true">
+        <i class="fa-solid fa-circle-check"></i>
+    </span>
+    <span class="catalog-toast__text">Produto adicionado ao carrinho!</span>
+</div>
+
+<main class="catalog{% if catalog_readonly %} catalog--readonly{% endif %}">
+    <div class="catalog__header">
+        <h1 class="catalog__title">Catálogo de Produtos</h1>
+        {% if catalog_readonly %}
+        <p class="catalog__ops-banner" role="status">
+            <i class="fa-solid fa-lock" aria-hidden="true"></i>
+            Operações encerradas — consulta de estoque e preços apenas. Novas vendas estão bloqueadas.
+        </p>
+        {% endif %}
+        <p class="catalog__subtitle" id="resultsInfo">{{ products|rejectattr('catalog_oculto')|list|length }} produtos disponíveis</p>
+    </div>
+
+    <div class="product-grid" id="productGrid">
+        {% for product in products if not product.catalog_oculto %}
+        {% include 'partials/catalog_card.html' %}
+        {% endfor %}
+    </div>
+
+    <p class="catalog__empty" id="emptyState" hidden>
+        Nenhum produto encontrado para sua busca.
+    </p>
+</main>
+
+<dialog
+    class="catalog-options"
+    id="catalogOptionsDialog"
+    aria-labelledby="catalogOptionsTitle"
+>
+    <div class="catalog-options__panel">
+        <header class="catalog-options__header">
+            <div class="catalog-options__heading">
+                <p class="catalog-options__eyebrow">Opções do produto</p>
+                <h2 class="catalog-options__title" id="catalogOptionsTitle">Variantes</h2>
+            </div>
+            <button type="button" class="catalog-options__close" id="catalogOptionsClose" aria-label="Fechar opções">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="catalog-options__body" id="catalogOptionsGrid"></div>
+    </div>
+</dialog>
+
+{% if not catalog_readonly %}
+<dialog
+    class="stock-conflict"
+    id="stockConflictDialog"
+    aria-labelledby="stockConflictTitle"
+    aria-describedby="stockConflictText"
+>
+    <div class="stock-conflict__panel">
+        <header class="stock-conflict__header">
+            <div class="stock-conflict__icon" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <h2 class="stock-conflict__title" id="stockConflictTitle">Estoque prestes a esgotar</h2>
+            <p class="stock-conflict__text" id="stockConflictText"></p>
+        </header>
+        <div class="stock-conflict__product" id="stockConflictProduct">
+            <img class="stock-conflict__image" id="stockConflictImage" alt="" hidden>
+            <div class="stock-conflict__product-info">
+                <p class="stock-conflict__name" id="stockConflictName"></p>
+                <p class="stock-conflict__meta" id="stockConflictMeta"></p>
+            </div>
+        </div>
+        <div class="stock-conflict__split" id="stockConflictSplit" hidden>
+            <div class="stock-conflict__split-now">
+                <strong id="stockConflictSellable">0 un.</strong>
+                <span>com estoque agora</span>
+            </div>
+            <div class="stock-conflict__split-pending">
+                <strong id="stockConflictPendingQty">0 un.</strong>
+                <span>retirada posterior</span>
+            </div>
+        </div>
+        <div class="stock-conflict__actions">
+            <button type="button" class="stock-conflict__btn stock-conflict__btn--pending" id="stockConflictPending">
+                Vender como unidade pendente
+            </button>
+            <button type="button" class="stock-conflict__btn stock-conflict__btn--remove" id="stockConflictRemove">
+                Remover do carrinho
+            </button>
+        </div>
+    </div>
+</dialog>
+{% endif %}
+
+<div class="cart-backdrop" id="cartBackdrop" aria-hidden="true"></div>
+
+<aside
+    class="cart-drawer"
+    id="cartDrawer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="cartDrawerTitle"
+    aria-hidden="true"
+>
+    <header class="cart-drawer__header">
+        <h2 class="cart-drawer__title" id="cartDrawerTitle">
+            <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+            Meu carrinho
+            <span class="cart-drawer__title-count" id="cartDrawerCount">0</span>
+        </h2>
+        <button type="button" class="cart-drawer__close" id="cartDrawerClose" aria-label="Fechar carrinho">
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+    </header>
+
+    <div class="cart-drawer__body">
+        <div class="cart-drawer__empty" id="cartDrawerEmpty">
+            <div class="cart-drawer__empty-icon">
+                <i class="fa-solid fa-basket-shopping" aria-hidden="true"></i>
+            </div>
+            <p class="cart-drawer__empty-title">Seu carrinho está vazio</p>
+            <p class="cart-drawer__empty-text">
+                Adicione produtos do catálogo para continuar.
+            </p>
+        </div>
+        <div class="cart-drawer__items" id="cartDrawerItems" hidden></div>
+        <div class="cart-drawer__warning" id="cartDrawerBackorderWarning" hidden role="alert">
+            <i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+            <p>Remova os produtos com <strong>vendas futuras bloqueadas</strong> ou reduza a quantidade ao estoque disponível para finalizar a compra.</p>
+        </div>
+    </div>
+
+    <footer class="cart-drawer__footer">
+        <div class="cart-drawer__summary">
+            <span class="cart-drawer__summary-label">Total</span>
+            <span class="cart-drawer__summary-value" id="cartDrawerTotal">R$ 0,00</span>
+        </div>
+        <button
+            type="button"
+            class="cart-drawer__checkout"
+            id="cartDrawerCheckout"
+            disabled
+        >
+            Finalizar compra
+            <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+        </button>
+        <button
+            type="button"
+            class="cart-drawer__clear"
+            id="cartDrawerClear"
+            disabled
+        >
+            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+            Limpar carrinho
+        </button>
+    </footer>
+</aside>

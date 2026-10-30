@@ -1,0 +1,44 @@
+{# Preço do produto no evento (página do produto no estoque do evento).
+   data-live-stock-form: o admin-stock-live.js envia sem recarregar. #}
+<form method="post"
+      action="{{ url_for('admin_event_stock_price', event_id=event.id, product_id=product.id) }}"
+      class="admin-product__price-form admin-prodv__form"
+      data-live-stock-form>
+    {% include 'partials/csrf_field.html' %}
+    <label class="admin-prodv__form-label" for="event-price-input">
+        Preço de venda neste {{ event|op_noun(lower=True) }}
+    </label>
+    <div class="admin-prodv__input-row">
+        <span class="admin-prodv__affix">
+            <span class="admin-prodv__affix-text" aria-hidden="true">R$</span>
+            <input id="event-price-input"
+                   type="text"
+                   name="price"
+                   class="admin-field__input admin-product__price-input"
+                   value="{{ '%.2f' | format(product.preco) | replace('.', ',') }}"
+                   inputmode="decimal"
+                   autocomplete="off"
+                   aria-label="Preço do produto neste {{ event|op_noun(lower=True) }}">
+        </span>
+        <button type="submit"
+                class="admin-btn admin-btn--primary admin-product__price-save"
+                title="Salvar preço neste {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-check" aria-hidden="true"></i>
+            Salvar
+        </button>
+    </div>
+    <p class="admin-prodv__hint">
+        Preço-base da biblioteca:
+        <strong>{{ (product.preco_biblioteca if product.preco_biblioteca is defined else product.preco) | brl }}</strong>
+        {% if product.preco_evento_override %}
+        <button type="submit"
+                name="restore_base"
+                value="1"
+                class="admin-prodv__link-btn admin-product__price-restore"
+                title="Voltar a usar o preço da biblioteca neste {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+            Usar o preço da biblioteca
+        </button>
+        {% endif %}
+    </p>
+</form>

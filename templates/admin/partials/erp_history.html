@@ -1,0 +1,30 @@
+{# Integração ERP — vendas anteriores à integração. Renderizado também por admin_erp_live (painel ao vivo, static/js/admin-erp-live.js). #}
+<article class="admin-card">
+    <header class="admin-card__header">
+        <div>
+            <h2 class="admin-card__title">Vendas anteriores à integração</h2>
+            <p class="admin-card__subtitle">
+                {{ unsent_total }} venda(s) confirmada(s) nunca foram ao ERP. Elas não são enviadas
+                sozinhas. Ao enfileirar, cada uma precisa de cliente com endereço completo e bairro;
+                as que não tiverem ficam na fila com erro.
+            </p>
+        </div>
+    </header>
+    {% if events_unsent %}
+    <ul class="erp-history">
+        {% for ev in events_unsent %}
+        <li>
+            <span>{{ ev.name }} <small>({{ ev.count }} venda(s))</small></span>
+            <form method="post" action="{{ url_for('admin_erp_enqueue_history') }}" data-erp-action
+                  data-confirm="{{ ('Enviar ao ERP as ' ~ ev.count ~ ' venda(s) de ' ~ ev.name ~ '?') | e }}">
+                {% include 'partials/csrf_field.html' %}
+                <input type="hidden" name="event_id" value="{{ ev.id }}">
+                <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">Enfileirar</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="erp-empty">Nada pendente.</p>
+    {% endif %}
+</article>

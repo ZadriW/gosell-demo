@@ -1,0 +1,273 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Usuários - Admin | Go Sell{% endblock %}
+
+{#
+    Seção Usuários: todas as contas do Go Sell (vendedores, marketing,
+    administradores e personalizados). Tipo e permissões em
+    partials/user_access_fields.html; a tabela das contas é ``sellers``.
+#}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-users.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+{% set fe = seller_form_errors or {} %}
+{% set sf = seller_form or {} %}
+<section class="admin-section">
+    <header class="admin-section__header">
+        <h1 class="admin-section__title">Usuários</h1>
+        <p class="admin-section__subtitle">
+            Crie os usuários do Go Sell e defina o que cada um pode fazer: use um tipo pré-definido
+            (Administrador, Vendedor ou Marketing) ou marque as permissões uma a uma.
+        </p>
+    </header>
+
+    <article class="admin-card admin-seller-create">
+        <header class="admin-card__header">
+            <i class="fa-solid fa-user-plus admin-card__icon" aria-hidden="true"></i>
+            <div>
+                <h2 class="admin-card__title">Criar usuário</h2>
+                <p class="admin-card__subtitle">O acesso é pelo botão “Entrar” na tela inicial, com o usuário e a senha definidos aqui.</p>
+            </div>
+        </header>
+        <form method="post" action="{{ url_for('admin_sellers') }}" class="admin-card__form" novalidate>
+            {% include 'partials/csrf_field.html' %}
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-name">Nome</label>
+                <input
+                    id="seller-name"
+                    class="admin-field__input{% if fe.name %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="name"
+                    maxlength="120"
+                    required
+                    value="{{ sf.name | default('', true) }}"
+                    {% if fe.name %}aria-invalid="true" aria-describedby="seller-name-err"{% endif %}
+                >
+                {% if fe.name %}<p class="admin-field__error" id="seller-name-err">{{ fe.name }}</p>{% endif %}
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-username">Usuário</label>
+                <input
+                    id="seller-username"
+                    class="admin-field__input{% if fe.username %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="username"
+                    maxlength="40"
+                    required
+                    autocomplete="username"
+                    value="{{ sf.username | default('', true) }}"
+                    {% if fe.username %}aria-invalid="true" aria-describedby="seller-username-err"{% endif %}
+                >
+                {% if fe.username %}<p class="admin-field__error" id="seller-username-err">{{ fe.username }}</p>{% endif %}
+            </div>
+            <div class="admin-field" data-sell-only>
+                <label class="admin-field__label" for="seller-codvend">Código no ERP (CODVEND)</label>
+                <input
+                    id="seller-codvend"
+                    class="admin-field__input{% if fe.erp_codvend %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="erp_codvend"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="10"
+                    placeholder="ex.: 29"
+                    value="{{ sf.erp_codvend | default('', true) }}"
+                    {% if fe.erp_codvend %}aria-invalid="true" aria-describedby="seller-codvend-err"{% endif %}
+                >
+                <p class="admin-field__hint">As vendas deste vendedor vão ao ERP com este código. Sem ele, ficam na fila com erro até ser preenchido.</p>
+                {% if fe.erp_codvend %}<p class="admin-field__error" id="seller-codvend-err">{{ fe.erp_codvend }}</p>{% endif %}
+            </div>
+            <div class="admin-field" data-sell-only>
+                <label class="admin-field__label" for="seller-event-id">Evento de venda <span aria-hidden="true">*</span></label>
+                <select
+                    id="seller-event-id"
+                    name="event_id"
+                    class="admin-field__input{% if fe.event_id %} admin-field__input--invalid{% endif %}"
+                    required
+                    {% if not events_for_seller_form %}disabled{% endif %}
+                    {% if fe.event_id %}aria-invalid="true" aria-describedby="seller-event-err"{% endif %}
+                >
+                    <option value="" {% if not sf.event_id %}selected{% endif %} disabled>Selecione o evento…</option>
+                    {% for ev in events_for_seller_form %}
+                    <option
+                        value="{{ ev.id }}"
+                        {% if (sf.event_id or '') | string == ev.id | string %}selected{% endif %}
+                    >
+                        {{ ev.name }}{% if not ev.active %} (arquivado){% elif ev.operations_closed %} (encerrado){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                {% if fe.event_id %}<p class="admin-field__error" id="seller-event-err">{{ fe.event_id }}</p>{% endif %}
+                {% if not events_for_seller_form %}
+                <p class="admin-field__hint" role="status">Não há eventos cadastrados. <a href="{{ url_for('admin_events') }}">Crie um evento</a> antes de associar vendedores.</p>
+                {% else %}
+                <p class="admin-field__hint">Evento em que o usuário vende (catálogo, estoque e vendas). Cada conta vende em <strong>um único</strong> evento.</p>
+                {% endif %}
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-password">Senha inicial</label>
+                <span class="admin-field__wrap admin-field__wrap--has-toggle">
+                    <input
+                        id="seller-password"
+                        class="admin-field__input{% if fe.password %} admin-field__input--invalid{% endif %}"
+                        type="password"
+                        name="password"
+                        minlength="6"
+                        required
+                        value=""
+                        autocomplete="new-password"
+                        data-lpignore="true"
+                        {% if fe.password %}aria-invalid="true" aria-describedby="seller-password-err"{% endif %}
+                    >
+                    <button
+                        type="button"
+                        class="admin-field__toggle-pass"
+                        id="adminSellerCreateTogglePassword"
+                        aria-label="Mostrar senha"
+                        aria-pressed="false"
+                        title="Mostrar senha"
+                    >
+                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                    </button>
+                </span>
+                {% if fe.password %}<p class="admin-field__error" id="seller-password-err">{{ fe.password }}</p>{% endif %}
+            </div>
+            {% include 'admin/partials/user_access_fields.html' %}
+            {% if fe.access %}<p class="admin-field__error" role="alert">{{ fe.access }}</p>{% endif %}
+            <button type="submit" class="admin-btn admin-btn--primary admin-btn--block">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Criar usuário
+            </button>
+        </form>
+    </article>
+</section>
+
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title">Contas cadastradas</h2>
+            <p class="admin-section__subtitle">
+                Exibindo {{ sellers|length }} {% if sellers|length == 1 %}usuário{% else %}usuários{% endif %}.
+            </p>
+        </div>
+    </header>
+
+    <div class="admin-table admin-sellers" role="table" aria-label="Usuários cadastrados">
+        <div class="admin-table__head admin-sellers__row" role="row">
+            <span role="columnheader">Usuário</span>
+            <span role="columnheader">Eventos</span>
+            <span role="columnheader">Status</span>
+            <span class="admin-table__col--num" role="columnheader">Vendas</span>
+            <span class="admin-table__col--num" role="columnheader">Faturamento</span>
+            <span role="columnheader">Último login</span>
+            <span role="columnheader">Ações</span>
+        </div>
+
+        {% if sellers %}
+            {% for seller in sellers %}
+            <div class="admin-sellers__row" role="row">
+                <span class="admin-sellers__person">
+                    <strong>{{ seller.name }} <span class="users-role users-role--{{ seller.role }}">{{ seller.role_label }}</span></strong>
+                    <small>{{ seller.username or seller.email }}{% if seller.can_sell %} · {% if seller.erp_codvend %}CODVEND {{ seller.erp_codvend }}{% else %}<span class="admin-sellers__no-codvend">sem CODVEND</span>{% endif %}{% endif %}</small>
+                    {% if seller.role == 'personalizado' %}<small class="users-perms">{{ seller.permission_labels|join(' · ') or 'Nenhuma permissão' }}</small>{% endif %}
+                </span>
+                <span class="admin-sellers__events-cell">
+                    {% if seller.has_panel and seller.all_events %}
+                        <span class="admin-sellers__event-none" title="Acessa todos os eventos no painel">Todos os eventos</span>
+                    {% elif seller.has_panel and seller.panel_event_ids %}
+                        {% for eid in seller.panel_event_ids %}
+                            {% set pev = events_for_seller_form|selectattr('id', 'equalto', eid)|first %}
+                            {% if pev %}<a href="{{ event_home_url(pev.id) or '#' }}" class="admin-nav__event-badge admin-sellers__event-badge{% if not pev.active %} admin-sellers__event-badge--archived{% endif %}"{% set ps = pev.badge_color | event_badge_style %}{% if ps %} style="{{ ps }}"{% endif %} title="Painel: {{ pev.name }}">{{ pev.name }}</a>{% endif %}
+                        {% endfor %}
+                    {% endif %}
+                    {% if seller.can_sell and seller.assigned_events %}
+                        {% for ev in seller.assigned_events if not (seller.has_panel and ev.event_id in seller.panel_event_ids) %}
+                            {% set ev_style = ev.badge_color | event_badge_style %}
+                            <a
+                                href="{{ url_for('admin_event_detail', event_id=ev.event_id) }}"
+                                class="admin-nav__event-badge admin-sellers__event-badge{% if not ev.active %} admin-sellers__event-badge--archived{% endif %}"
+                                {% if ev_style %}style="{{ ev_style }}"{% endif %}
+                                title="{% if not ev.active %}[Arquivado] {% endif %}{{ ev.name }}"
+                            >
+                                {{ ev.name }}
+                            </a>
+                        {% endfor %}
+                    {% elif not seller.has_panel %}
+                        <span class="admin-sellers__event-none" title="Sem evento de venda">—</span>
+                    {% endif %}
+                </span>
+                <span>
+                    {% if seller.active %}
+                        <span class="admin-badge admin-badge--success">Ativo</span>
+                    {% else %}
+                        <span class="admin-badge admin-badge--neutral">Inativo</span>
+                    {% endif %}
+                </span>
+                <span class="admin-table__col--num">{{ seller.transactions_count }}</span>
+                <span class="admin-table__col--num"><strong>{{ seller.total_revenue | brl }}</strong></span>
+                <span>{{ seller.last_login_at | datahora }}</span>
+                <span class="admin-stock__actions admin-sellers__actions">
+                    <a
+                        class="admin-btn admin-btn--ghost admin-btn--sm"
+                        href="{{ url_for('admin_seller_detail', seller_id=seller.id) }}"
+                        aria-label="Abrir {{ seller.name }}"
+                        title="Abrir usuário"
+                    >
+                        <i class="fa-solid fa-user-pen" aria-hidden="true"></i>
+                    </a>
+                    <form
+                        method="post"
+                        action="{{ url_for('admin_seller_delete', seller_id=seller.id) }}"
+                        class="admin-sellers__delete-form"
+                        data-confirm="{{ ('Excluir permanentemente o usuário ' ~ seller.name ~ '? As vendas confirmadas permanecem no histórico, sem vínculo a esta conta.') | e }}"
+                    >
+                        {% include 'partials/csrf_field.html' %}
+                        <button
+                            type="submit"
+                            class="admin-btn admin-btn--ghost admin-btn--sm admin-btn--danger"
+                            title="Excluir cadastro"
+                            aria-label="Excluir cadastro de {{ seller.name }}"
+                        >
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                </span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>Nenhum usuário cadastrado.</p>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+(function () {
+    function bindToggle(inputId, btnId, labelShow, labelHide) {
+        var input = document.getElementById(inputId);
+        var btn = document.getElementById(btnId);
+        if (!input || !btn) return;
+        var icon = btn.querySelector('i');
+        btn.addEventListener('click', function () {
+            var hidden = input.type === 'password';
+            input.type = hidden ? 'text' : 'password';
+            btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+            btn.setAttribute('aria-label', hidden ? labelHide : labelShow);
+            btn.setAttribute('title', hidden ? labelHide : labelShow);
+            if (icon) {
+                icon.className = hidden ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+            }
+        });
+    }
+    bindToggle('seller-password', 'adminSellerCreateTogglePassword', 'Mostrar senha', 'Ocultar senha');
+})();
+</script>
+<script src="{{ url_for('static', filename='js/admin-user-access.js') }}"></script>
+{% endblock %}

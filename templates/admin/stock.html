@@ -1,0 +1,179 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Estoque - Admin | Go Sell{% endblock %}
+
+{% block admin_body %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">Controle de estoque</h1>
+            <p class="admin-section__subtitle">
+                {{ stock.products_count }} produtos cadastrados &middot;
+                {{ stock.units_in_stock }} unidades &middot;
+                <strong>{{ stock.below_min }}</strong> abaixo do mínimo
+            </p>
+        </div>
+    </header>
+
+    <form class="admin-filters" method="get" action="{{ url_for('admin_stock') }}#lista"
+          data-scroll-to-table>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Buscar</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-magnifying-glass admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ filters.q }}"
+                    placeholder="Nome, variante, SKU ou ID..."
+                    class="admin-filter__input"
+                >
+            </span>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Categoria</span>
+            <select name="categoria" class="admin-filter__input">
+                <option value="todos" {% if filters.categoria == 'todos' %}selected{% endif %}>Todas</option>
+                {% for c in categories %}
+                <option value="{{ c }}" {% if filters.categoria == c %}selected{% endif %}>{{ c }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Situação</span>
+            <select name="status" class="admin-filter__input">
+                <option value="todos" {% if filters.status == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="baixo" {% if filters.status == 'baixo' %}selected{% endif %}>Abaixo do mínimo</option>
+                <option value="sem_estoque" {% if filters.status == 'sem_estoque' %}selected{% endif %}>Sem estoque</option>
+                <option value="inativo" {% if filters.status == 'inativo' %}selected{% endif %}>Inativo</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Por página</span>
+            <select name="per_page" class="admin-filter__input" title="Quantidade de produtos listados por requisição">
+                {% for n in allowed_per_page %}
+                <option value="{{ n }}" {% if filters.per_page == n %}selected{% endif %}>{{ n }} produtos</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <input type="hidden" name="page" value="1" aria-hidden="true">
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('admin_stock') }}" class="admin-btn admin-btn--ghost">Limpar</a>
+        </div>
+    </form>
+
+    <div
+        id="lista"
+        class="admin-table admin-stock"
+        role="table"
+        aria-label="Produtos em estoque"
+        data-admin-stock-list
+        data-api-url="{{ url_for('admin_api_stock', q=filters.q, categoria=filters.categoria, status=filters.status, per_page=filters.per_page, page=pagination.page) }}"
+    >
+        <div class="admin-table__head admin-stock__row" role="row">
+            <span role="columnheader">Produto</span>
+            <span class="admin-table__col--num" role="columnheader">Preço</span>
+            <span class="admin-table__col--num" role="columnheader">Estoque</span>
+            <span class="admin-table__col--num" role="columnheader">Mínimo</span>
+            <span role="columnheader">Situação</span>
+            <span role="columnheader" class="admin-stock__actions-head">Ações</span>
+        </div>
+
+        {% if products %}
+            {% for p in products %}
+            <div class="admin-stock__row" data-product-id="{{ p.id }}">
+                <span class="admin-stock__product">
+                    <img class="admin-stock__thumb" src="{{ p.imagem }}" alt="{{ p.nome }}" loading="lazy" onerror="this.style.visibility='hidden'">
+                    <span>
+                        <strong>{{ p.nome }}</strong>
+                        {% if p.variante %}<span class="admin-stock__variant">{{ p.variante }}</span>{% endif %}
+                        <small class="admin-stock__meta">ID: {{ p.id }} | SKU: <code class="admin-stock__sku-code">{{ p.sku or '—' }}</code></small>
+                    </span>
+                </span>
+                <span class="admin-table__col--num">{{ p.preco | brl }}</span>
+                <span class="admin-table__col--num admin-stock__qty" data-stock-qty>
+                    <strong>{{ p.estoque }}</strong>
+                </span>
+                <span class="admin-table__col--num">{{ p.estoque_minimo }}</span>
+                <span data-stock-status>
+                    {% if not p.ativo %}
+                        <span class="admin-badge admin-badge--neutral">Inativo</span>
+                    {% elif p.sem_estoque %}
+                        <span class="admin-badge admin-badge--danger">Sem estoque</span>
+                    {% elif p.abaixo_minimo %}
+                        <span class="admin-badge admin-badge--warn">Abaixo do mínimo</span>
+                    {% else %}
+                        <span class="admin-badge admin-badge--success">OK</span>
+                    {% endif %}
+                </span>
+                <span class="admin-stock__actions">
+                    <a class="admin-btn admin-btn--ghost admin-btn--sm"
+                       href="{{ url_for('admin_stock_product', product_id=p.id) }}"
+                       title="Gerenciar"
+                       aria-label="Gerenciar {{ p.nome }}">
+                        <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                    </a>
+                </span>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>Nenhum produto corresponde aos filtros aplicados.</p>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if pagination.total > 0 %}
+    <nav class="admin-pagination" aria-label="Paginação da listagem de estoque">
+        <p class="admin-pagination__summary">
+            Mostrando
+            <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+            de <strong>{{ pagination.total }}</strong> produto(s)
+            · página {{ pagination.page }} de {{ pagination.total_pages }}
+        </p>
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_stock', q=filters.q, categoria=filters.categoria, status=filters.status, per_page=filters.per_page, page=pagination.page - 1) }}"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_stock', q=filters.q, categoria=filters.categoria, status=filters.status, per_page=filters.per_page, page=pagination.page + 1) }}"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-stock-live.js') }}?v=confirm1"></script>
+{% endblock %}

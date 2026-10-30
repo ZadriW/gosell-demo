@@ -1,0 +1,315 @@
+{% extends "admin/_layout.html" %}
+{% from "macros/promo_rule.html" import GIFT_RULE_META, gift_rule_text, gift_rule_icon %}
+
+{#
+    Brinde: criação (rule = None, rota admin_event_gift_new) e edição.
+    ``state`` traz os valores do formulário (salvos ou do POST recusado).
+    Comportamento em static/js/admin-gift-form.js (+ admin-promo-picker.js);
+    estilos em css/admin-promos.css.
+#}
+
+{% set is_new = rule is none %}
+{% set readonly = not event_ops_open(event) %}
+{% set rt = state.rule_type %}
+{% set list_url = url_for('admin_event_promotions', event_id=event.id, modo='brindes') %}
+
+{% block title %}{{ 'Novo brinde' if is_new else rule.name }} — Brindes | {{ event.name }} | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-promos.css') }}?v=avulsos2">
+{% endblock %}
+
+{% macro qty(value, default) -%}{{ value if value is not none else default }}{%- endmacro %}
+
+{% macro picker(selected, single, noun_one, noun_many, placeholder, empty_text, role='data-promo-picker') %}
+<div class="promo-picker{% if single %} promo-picker--single{% endif %}" data-catalog-src="#giftCatalog"
+     data-readonly="{{ '1' if readonly else '0' }}" data-noun-one="{{ noun_one }}" data-noun-many="{{ noun_many }}"
+     data-selected="{{ selected|tojson|forceescape }}"{{ {role: ''}|xmlattr }}>
+    {% if not readonly %}
+    <div class="promo-picker__search">
+        <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        <input type="search" data-picker-input autocomplete="off" spellcheck="false"
+               placeholder="{{ placeholder }}" role="combobox" aria-expanded="false"
+               aria-label="{{ placeholder }}">
+        <kbd class="promo-picker__kbd" aria-hidden="true">Enter</kbd>
+    </div>
+    <div class="promo-picker__results" role="listbox" data-picker-results hidden></div>
+    {% endif %}
+    {% if not single %}
+    <div class="promo-picker__head">
+        <strong data-picker-count>0 produtos</strong>
+        {% if not readonly %}
+        <button type="button" class="promo-link-btn" data-picker-clear hidden>Remover todos</button>
+        {% endif %}
+    </div>
+    {% endif %}
+    <ul class="promo-picker__selected" data-picker-selected></ul>
+    <div class="promo-picker__empty" data-picker-empty>
+        <i class="fa-solid {{ 'fa-gift' if single else 'fa-basket-shopping' }}" aria-hidden="true"></i>
+        <span>{{ empty_text }}</span>
+    </div>
+    <div data-picker-inputs hidden></div>
+</div>
+{% endmacro %}
+
+{% block admin_body %}
+<section class="admin-section promo-page promo-page--gifts">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">{{ 'Novo brinde' if is_new else rule.name }}</h1>
+            <p class="admin-section__subtitle">
+                {% if is_new %}
+                Escolha o brinde (produtos do estoque, brindes avulsos ou os dois), quando ele sai e quais compras contam. O brinde entra sozinho no pedido, a R$ 0,00.
+                {% else %}
+                <span class="admin-badge {{ 'admin-badge--success' if rule.active else 'admin-badge--neutral' }}">{{ 'Ativo' if rule.active else 'Inativo' }}</span>
+                {{ gift_rule_text(rule) }}
+                {% endif %}
+            </p>
+        </div>
+        {% if not is_new and not readonly %}
+        <div class="promo-page__actions">
+            <form method="post" action="{{ url_for('admin_event_gift_toggle', event_id=event.id, rule_id=rule.id) }}">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="promo-switch promo-switch--lg" role="switch" aria-checked="{{ 'true' if rule.active else 'false' }}">
+                    <span class="promo-switch__track" aria-hidden="true"><span class="promo-switch__knob"></span></span>
+                    <span class="promo-switch__label">{{ 'Ativo' if rule.active else 'Inativo' }}</span>
+                </button>
+            </form>
+            <form method="post" action="{{ url_for('admin_event_gift_delete', event_id=event.id, rule_id=rule.id) }}"
+                  data-confirm="Excluir o brinde «{{ rule.name }}»? Vendas já feitas mantêm o brinde que ganharam."
+                  data-confirm-title="Excluir brinde" data-confirm-label="Excluir">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost promo-card__delete">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i> Excluir
+                </button>
+            </form>
+        </div>
+        {% endif %}
+    </header>
+
+    {% if readonly %}
+    <p class="promo-readonly"><i class="fa-solid fa-lock" aria-hidden="true"></i> As operações deste evento estão encerradas: o brinde pode ser consultado, mas não alterado.</p>
+    {% endif %}
+
+    <script type="application/json" id="giftCatalog">{{ picker_catalog|tojson }}</script>
+
+    <form method="post" id="giftForm" class="promo-editor" novalidate data-gift-form
+          action="{{ url_for('admin_event_gift_create', event_id=event.id) if is_new else url_for('admin_event_gift_edit', event_id=event.id, rule_id=rule.id) }}">
+        {% include 'partials/csrf_field.html' %}
+
+        <div class="promo-editor__main">
+            <fieldset class="promo-editor__fieldset" {% if readonly %}disabled{% endif %}>
+
+            {# ---------------- 1. Nome ---------------- #}
+            <section class="promo-step">
+                <header class="promo-step__head">
+                    <span class="promo-step__num">1</span>
+                    <div>
+                        <h2 class="promo-step__title">Nome</h2>
+                        <p class="promo-step__hint">É como o brinde aparece para o vendedor, no carrinho e na nota.</p>
+                    </div>
+                </header>
+                <input type="text" name="name" class="admin-field__input promo-name-input" id="gift-name"
+                       value="{{ state.name }}" maxlength="120" autocomplete="off" required
+                       placeholder="Ex.: Brinde Squeeze na compra de 3 resinas" data-gift-name aria-label="Nome do brinde">
+            </section>
+
+            {# ---------------- 2. Brinde ---------------- #}
+            <section class="promo-step">
+                <header class="promo-step__head">
+                    <span class="promo-step__num">2</span>
+                    <div>
+                        <h2 class="promo-step__title">Brinde</h2>
+                        <p class="promo-step__hint">O que o cliente ganha: um ou mais produtos do estoque do evento, um ou mais brindes avulsos (cadastrados só no Go Sell), ou produtos e avulsos juntos.</p>
+                    </div>
+                </header>
+                {% set src = state.gift_source or 'produto' %}
+                {# Escolhidos: ficam aqui, visíveis em qualquer aba (admin-gift-form.js). #}
+                <div class="gift-selected" data-gift-selected aria-live="polite">
+                    <p class="gift-selected__empty" data-gift-selected-empty>
+                        <i class="fa-solid fa-gift" aria-hidden="true"></i>
+                        Nenhum brinde escolhido. Escolha produtos do estoque, brindes avulsos ou os dois.
+                    </p>
+                    <ul class="gift-selected__list" data-gift-selected-list></ul>
+                </div>
+                <div class="gift-source" role="radiogroup" aria-label="Adicionar brinde">
+                    <label class="gift-source__opt">
+                        <input type="radio" name="gift_source" value="produto" {% if src == 'produto' %}checked{% endif %} data-gift-source>
+                        <i class="fa-solid fa-box" aria-hidden="true"></i>
+                        <span><strong>Produto do estoque</strong><small>Sai do saldo do evento e vai ao ERP com 100% de desconto</small></span>
+                    </label>
+                    <label class="gift-source__opt">
+                        <input type="radio" name="gift_source" value="avulso" {% if src == 'avulso' %}checked{% endif %} data-gift-source>
+                        <i class="fa-solid fa-gift" aria-hidden="true"></i>
+                        <span><strong>Brinde avulso</strong><small>Não é produto nem está no ERP (caneca, squeeze...). Dá para marcar vários</small></span>
+                    </label>
+                </div>
+
+                <div class="gift-source__panel" data-gift-source-panel="produto">
+                {{ picker(state.gift_product_ids or [], false,
+                          'produto de brinde', 'produtos de brinde',
+                          'Buscar produtos do brinde (nome, SKU ou marca; dá para colar vários SKUs)',
+                          'Nenhum produto escolhido.' ~ ('' if readonly else ' Busque acima e clique para escolher.'),
+                          'data-gift-picker') }}
+                </div>
+
+                <div class="gift-source__panel" data-gift-source-panel="avulso">
+                    {# Um ``gift_item_id`` por avulso marcado; "novo" cadastra mais um junto. #}
+                    {% set chosen_items = state.gift_item_ids or [] %}
+                    <div class="gift-avulsos" role="group" aria-label="Brindes avulsos">
+                        {% for item in gift_items %}
+                        <label class="gift-avulso">
+                            <input type="checkbox" name="gift_item_id" value="{{ item.id }}" {% if item.id in chosen_items %}checked{% endif %}
+                                   data-gift-item data-name="{{ item.name }}" data-available="{{ '' if item.available is none else item.available }}">
+                            <span class="gift-avulso__icon"><i class="fa-solid fa-gift" aria-hidden="true"></i></span>
+                            <span class="gift-avulso__text">
+                                <strong>{{ item.name }}</strong>
+                                <small>{% if item.available is none %}Sem limite{% else %}{{ item.available }} de {{ item.stock }} disponíve{{ 'l' if item.stock == 1 else 'is' }}{% endif %} · {{ item.used }} entregue{{ '' if item.used == 1 else 's' }}</small>
+                            </span>
+                        </label>
+                        {% endfor %}
+                        {% if not readonly %}
+                        <label class="gift-avulso gift-avulso--new">
+                            <input type="checkbox" name="gift_item_id" value="{{ gift_new_item }}" {% if state.gift_item_new %}checked{% endif %} data-gift-item>
+                            <span class="gift-avulso__icon"><i class="fa-solid fa-plus" aria-hidden="true"></i></span>
+                            <span class="gift-avulso__text">
+                                <strong>Cadastrar novo brinde avulso</strong>
+                                <small>Fica salvo para outras regras deste evento</small>
+                            </span>
+                        </label>
+                        {% endif %}
+                    </div>
+                    <div class="gift-avulso__new" data-gift-new-fields>
+                        <label class="gift-items__field gift-items__field--name">
+                            <span>Nome do brinde avulso</span>
+                            <input type="text" name="new_item_name" class="admin-field__input" maxlength="120"
+                                   value="{{ state.new_item_name or '' }}" placeholder="Ex.: Caneca Go Sell" data-gift-new-name>
+                        </label>
+                        <label class="gift-items__field">
+                            <span>Quantidade disponível</span>
+                            <input type="number" name="new_item_stock" class="admin-field__input" min="0" step="1" inputmode="numeric"
+                                   value="{{ state.new_item_stock if state.new_item_stock is not none else '' }}" placeholder="Sem limite">
+                        </label>
+                    </div>
+                    <p class="promo-fields__hint">Marque quantos brindes avulsos quiser: cada um sai com a quantidade abaixo e o próprio saldo. O brinde avulso não mexe no estoque de produtos: o saldo é a quantidade disponível menos o que já saiu em vendas confirmadas. A lista completa fica na página de Brindes.</p>
+                </div>
+                <p class="promo-sentence promo-sentence--gift">
+                    O cliente ganha
+                    <span class="promo-input promo-input--qty"><input type="number" name="gift_qty" min="1" step="1" inputmode="numeric"
+                           value="{{ qty(state.gift_qty, 1) }}" aria-label="Unidades do brinde" data-gift-qty></span>
+                    unidade(s) de cada brinde escolhido cada vez que a regra se cumpre.
+                </p>
+            </section>
+
+            {# ---------------- 3. Regra ---------------- #}
+            <section class="promo-step">
+                <header class="promo-step__head">
+                    <span class="promo-step__num">3</span>
+                    <div>
+                        <h2 class="promo-step__title">Regra</h2>
+                        <p class="promo-step__hint">Quando o pedido ganha o brinde. O preço dos produtos não muda.</p>
+                    </div>
+                </header>
+
+                <div class="promo-rules" role="radiogroup" aria-label="Regra do brinde">
+                    {% for key, meta in GIFT_RULE_META.items() %}
+                    <label class="promo-rule">
+                        <input type="radio" name="rule_type" value="{{ key }}" {% if rt == key %}checked{% endif %} data-gift-rule>
+                        <span class="promo-rule__icon gift-type--{{ key }}"><i class="fa-solid {{ meta.icon }}" aria-hidden="true"></i></span>
+                        <span class="promo-rule__text">
+                            <strong>{{ meta.title }}</strong>
+                            <small>{{ meta.hint }}</small>
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+
+                <div class="promo-fields">
+                    <div class="promo-fields__section" data-rule-section="min_qty">
+                        <p class="promo-sentence">
+                            A partir de
+                            <span class="promo-input promo-input--qty"><input type="number" name="min_qty_min" min="1" step="1" inputmode="numeric"
+                                   value="{{ qty(state.min_qty if rt == 'min_qty' else none, 3) }}" aria-label="Unidades mínimas"></span>
+                            unidades dos produtos participantes, o pedido ganha o brinde.
+                        </p>
+                        <p class="promo-fields__hint">As unidades de todos os participantes somam juntas (ex.: 2 de um + 1 de outro = 3). O brinde sai uma vez por pedido.</p>
+                    </div>
+                    <div class="promo-fields__section" data-rule-section="kit">
+                        <p class="promo-sentence">
+                            A cada kit de
+                            <span class="promo-input promo-input--qty"><input type="number" name="min_qty_kit" min="2" step="1" inputmode="numeric"
+                                   value="{{ qty(state.min_qty if rt == 'kit' else none, 5) }}" aria-label="Unidades do kit"></span>
+                            unidades do mesmo produto, o pedido ganha o brinde.
+                        </p>
+                        <p class="promo-sentence promo-sentence--sub">
+                            Limite por pedido:
+                            <span class="promo-input promo-input--qty"><input type="number" name="max_per_order" min="1" step="1" inputmode="numeric"
+                                   value="{{ state.max_per_order if state.max_per_order else '' }}" placeholder="—" aria-label="Limite de brindes por pedido"></span>
+                            un. de brinde <small>(vazio = sem limite)</small>
+                        </p>
+                        <p class="promo-fields__hint">Cada produto forma os próprios kits: 10 un. de um item com kit de 5 = 2 brindes; 4 + 4 de itens diferentes não fecham kit.</p>
+                    </div>
+                    <div class="promo-fields__section" data-rule-section="min_total">
+                        <p class="promo-sentence">
+                            Pedidos a partir de
+                            <span class="promo-input promo-input--money"><span class="promo-input__affix">R$</span><input type="number" name="min_value" min="0.01" step="0.01" inputmode="decimal"
+                                   value="{{ '%.2f'|format(state.min_value) if state.min_value is not none else '' }}" placeholder="0,00" aria-label="Valor mínimo do pedido"></span>
+                            ganham o brinde.
+                        </p>
+                        <p class="promo-fields__hint">Conta o valor dos itens pagos, já com as promoções e o desconto manual do vendedor (o valor cobrado). O brinde sai uma vez por pedido. Com produtos no passo 4, só o valor deles conta.</p>
+                    </div>
+                </div>
+            </section>
+
+            {# ---------------- 4. Produtos ---------------- #}
+            <section class="promo-step">
+                <header class="promo-step__head">
+                    <span class="promo-step__num">4</span>
+                    <div>
+                        <h2 class="promo-step__title">Produtos participantes <span class="promo-step__optional" data-products-optional hidden>opcional</span></h2>
+                        <p class="promo-step__hint" data-products-hint>As compras destes produtos contam para a regra. Busque pelo nome, SKU, categoria ou marca (a marca seleciona todos os produtos dela); dá para colar vários SKUs de uma vez.</p>
+                    </div>
+                </header>
+                {{ picker(state.product_ids, false, 'produto participante', 'produtos participantes',
+                          'Buscar produto ou marca do evento… (ou cole SKUs separados por vírgula)',
+                          'Nenhum produto ainda.' ~ ('' if readonly else ' Use a busca acima para adicionar.')) }}
+            </section>
+            </fieldset>
+        </div>
+
+        {# ---------------- Resumo ---------------- #}
+        <aside class="promo-editor__aside">
+            <div class="promo-summary">
+                <p class="promo-summary__eyebrow">Resumo</p>
+                <div class="promo-summary__head">
+                    <span class="promo-summary__icon gift-type--{{ rt }}" data-summary-icon>
+                        <i class="fa-solid {{ gift_rule_icon(rt) }}" aria-hidden="true"></i>
+                    </span>
+                    <strong class="promo-summary__name" data-summary-name>{{ state.name or 'Sem nome' }}</strong>
+                </div>
+                <p class="promo-summary__sentence" data-summary-sentence></p>
+                <div class="gift-summary-gifts" data-summary-gifts hidden></div>
+                <p class="promo-summary__detail" data-summary-detail></p>
+                <p class="promo-summary__count"><i class="fa-solid fa-box-open" aria-hidden="true"></i> <span data-summary-count>0 produtos</span></p>
+                <ul class="promo-summary__missing" data-summary-missing></ul>
+                {% if not readonly %}
+                <button type="submit" class="admin-btn admin-btn--primary promo-summary__save">
+                    <i class="fa-solid {{ 'fa-plus' if is_new else 'fa-floppy-disk' }}" aria-hidden="true"></i>
+                    {{ 'Criar brinde' if is_new else 'Salvar alterações' }}
+                </button>
+                {% endif %}
+                <a class="admin-btn admin-btn--ghost promo-summary__cancel" href="{{ list_url }}">
+                    {{ 'Voltar' if readonly else 'Cancelar' }}
+                </a>
+                <p class="promo-summary__note"><i class="fa-solid fa-shield-halved" aria-hidden="true"></i> O brinde é recalculado no servidor a cada venda e sai a R$ 0,00 no pedido.</p>
+            </div>
+        </aside>
+    </form>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/product-search.js') }}?v=busca4"></script>
+<script src="{{ url_for('static', filename='js/admin-promo-picker.js') }}?v=marcas1"></script>
+<script src="{{ url_for('static', filename='js/admin-gift-form.js') }}?v=avulsos2"></script>
+{% endblock %}

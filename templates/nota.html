@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Nota de Retirada {% if tx %}#{{ tx.order_number }}{% endif %} | Go Sell</title>
+    <style>
+        /* ---------------------------------------------------------------
+           Reset + base
+        --------------------------------------------------------------- */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        :root {
+            --primary: #0e7490;
+            --text:    #1a1d2e;
+            --muted:   #6b7280;
+            --border:  #d1d5db;
+            --bg:      #f5f6fb;
+            --surface: #ffffff;
+        }
+
+        body {
+            font-family: 'Courier New', Courier, 'Lucida Console', monospace;
+            font-size: 13px;
+            line-height: 1.2;
+            color: var(--text);
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 32px 16px 64px;
+        }
+
+        /* ---------------------------------------------------------------
+           Wrapper do cupom (simula papel térmico em tela)
+        --------------------------------------------------------------- */
+        .receipt {
+            width: 100%;
+            max-width: 380px;
+            background: var(--surface);
+            box-shadow: 0 4px 24px rgba(14,116,144,.12), 0 1px 4px rgba(0,0,0,.06);
+            border-radius: 4px;
+            padding: 0;
+            position: relative;
+        }
+
+        /* borda dentada superior */
+        .receipt::before {
+            content: '';
+            display: block;
+            height: 10px;
+            background:
+                radial-gradient(circle at 8px -2px, var(--bg) 8px, transparent 8px),
+                repeating-linear-gradient(90deg, var(--bg) 0px, var(--bg) 6px, transparent 6px, transparent 16px);
+            background-size: 16px 10px, 100% 100%;
+        }
+
+        /* borda dentada inferior */
+        .receipt::after {
+            content: '';
+            display: block;
+            height: 10px;
+            background:
+                radial-gradient(circle at 8px 12px, var(--bg) 8px, transparent 8px),
+                repeating-linear-gradient(90deg, var(--bg) 0px, var(--bg) 6px, transparent 6px, transparent 16px);
+            background-size: 16px 10px, 100% 100%;
+        }
+
+        .receipt__body {
+            padding: 20px 16px 20px;
+        }
+
+        /* ---------------------------------------------------------------
+           Cabeçalho
+        --------------------------------------------------------------- */
+        .receipt__header {
+            text-align: center;
+            padding-bottom: 14px;
+            border-bottom: 1px dashed var(--border);
+            margin-bottom: 14px;
+        }
+
+        .receipt__logo {
+            height: 48px;
+            width: auto;
+            margin: 0 auto 6px;
+            display: block;
+        }
+
+        .receipt__brand {
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            color: var(--primary);
+            text-transform: uppercase;
+        }
+
+        .receipt__slogan {
+            font-size: 10px;
+            letter-spacing: .08em;
+            color: #000;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        /* ---------------------------------------------------------------
+           Título do documento
+        --------------------------------------------------------------- */
+        .receipt__doc-title {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            color: var(--primary);
+            padding: 10px 0;
+            border-bottom: 1px dashed var(--border);
+            margin-bottom: 12px;
+        }
+
+        /* ---------------------------------------------------------------
+           Bloco de metadados (pedido, data, status)
+        --------------------------------------------------------------- */
+        .receipt__meta {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 4px;
+            margin-bottom: 14px;
+        }
+
+        .receipt__meta-item {
+            display: flex;
+            flex-direction: row;
+            align-items: baseline;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .receipt__meta-item.full { grid-column: 1 / -1; }
+
+        .receipt__meta-label {
+            font-size: 11px;
+            letter-spacing: .04em;
+            color: #000;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .receipt__meta-label::after {
+            content: ':';
+        }
+
+        .receipt__meta-value {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        /* ---------------------------------------------------------------
+           Seção de cliente
+        --------------------------------------------------------------- */
+        .receipt__section {
+            border-top: 1px dashed var(--border);
+            padding-top: 12px;
+            margin-top: 12px;
+        }
+
+        .receipt__section-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: .12em;
+            color: #000;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .receipt__client-rows {
+            display: grid;
+            gap: 5px;
+        }
+
+        .receipt__client-row {
+            display: flex;
+            gap: 6px;
+            font-size: 11px;
+        }
+
+        .receipt__client-key {
+            color: #000;
+            font-weight: 600;
+            white-space: nowrap;
+            min-width: 60px;
+        }
+
+        .receipt__client-val {
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        /* ---------------------------------------------------------------
+           Itens do pedido
+        --------------------------------------------------------------- */
+        .receipt__items-head {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 0 8px;
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: #000;
+            font-weight: 600;
+            padding-bottom: 5px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 6px;
+        }
+
+        .receipt__items-head span:nth-child(2),
+        .receipt__items-head span:nth-child(3),
+        .receipt__items-head span:nth-child(4) { text-align: right; }
+
+        .receipt__item {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto;
+            gap: 2px 8px;
+            padding: 6px 0;
+            border-bottom: 1px dotted var(--border);
+        }
+
+        .receipt__item:last-child { border-bottom: none; }
+
+        .receipt__item-name {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--text);
+            word-break: break-word;
+        }
+
+        .receipt__item-unit {
+            font-size: 10px;
+            color: #000;
+            font-weight: 600;
+            text-align: right;
+            align-self: end;
+            white-space: nowrap;
+        }
+
+        .receipt__item-qty {
+            font-size: 10px;
+            color: #000;
+            font-weight: 600;
+            text-align: right;
+            align-self: end;
+        }
+
+        .receipt__item-subtotal {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text);
+            text-align: right;
+            align-self: end;
+        }
+
+        /* ---------------------------------------------------------------
+           Itens pendentes de retirada (entrega parcial)
+        --------------------------------------------------------------- */
+        .receipt__item-pending-tag {
+            grid-column: 1 / -1;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: #92400e;
+        }
+
+        .receipt__pending {
+            border: 1.5px dashed #92400e;
+            border-radius: 4px;
+            padding: 10px 12px;
+            margin-top: 12px;
+        }
+
+        .receipt__pending-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: #92400e;
+            margin-bottom: 6px;
+        }
+
+        .receipt__pending-row {
+            padding: 6px 0;
+            border-bottom: 1px dotted var(--border);
+        }
+
+        .receipt__pending-row:last-of-type {
+            border-bottom: none;
+        }
+
+        .receipt__pending-text {
+            font-size: 11px;
+            color: #000;
+            font-weight: 600;
+            margin-top: 6px;
+            line-height: 1.2;
+        }
+
+        /* ---------------------------------------------------------------
+           Totalizador
+        --------------------------------------------------------------- */
+        .receipt__totals {
+            border-top: 1px dashed var(--border);
+            padding-top: 10px;
+            margin-top: 6px;
+        }
+
+        .receipt__total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #000;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .receipt__total-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1.5px solid var(--text);
+        }
+
+        .receipt__total-main-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+        }
+
+        .receipt__total-main-value {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--primary);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* ---------------------------------------------------------------
+           Rodapé
+        --------------------------------------------------------------- */
+        .receipt__footer {
+            border-top: 1px dashed var(--border);
+            margin-top: 16px;
+            padding-top: 14px;
+            text-align: center;
+        }
+
+        .receipt__footer-title {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .1em;
+            color: var(--primary);
+            margin-bottom: 6px;
+        }
+
+        .receipt__footer-text {
+            font-size: 11px;
+            color: #000;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+
+        .receipt__footer-obs {
+            margin-bottom: 12px;
+            min-height: 28px;
+            text-align: left;
+        }
+
+        .receipt__footer-obs .receipt__footer-text {
+            white-space: pre-wrap;
+            text-align: left;
+        }
+
+        .receipt__footer-note {
+            margin-top: 12px;
+            font-size: 10px;
+            color: #000;
+            font-weight: 600;
+            border-top: 1px dotted var(--border);
+            padding-top: 10px;
+            line-height: 1.2;
+        }
+
+        /* ---------------------------------------------------------------
+           Estado de erro (pedido não encontrado)
+        --------------------------------------------------------------- */
+        .receipt__not-found {
+            text-align: center;
+            padding: 32px 0;
+        }
+
+        .receipt__not-found-icon {
+            font-size: 40px;
+            color: var(--muted);
+            margin-bottom: 12px;
+        }
+
+        .receipt__not-found h2 {
+            font-size: 14px;
+            color: var(--text);
+            margin-bottom: 6px;
+        }
+
+        .receipt__not-found p {
+            font-size: 12px;
+            color: #000;
+            font-weight: 600;
+        }
+
+        /* ---------------------------------------------------------------
+           Botão de impressão (ocultado na impressão)
+        --------------------------------------------------------------- */
+        .receipt__print-btn {
+            display: block;
+            width: calc(100% - 48px);
+            margin: 16px 24px 0;
+            padding: 10px 0;
+            background: var(--primary);
+            color: #fff;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .receipt__print-btn:hover { background: #0891b2; }
+
+        /* ---------------------------------------------------------------
+           @media print — cupom térmico (80 mm ≈ 302px @ 96dpi)
+        --------------------------------------------------------------- */
+        @media print {
+            @page {
+                size: 80mm auto;
+                margin: 4mm 2mm;
+            }
+
+            body {
+                background: #fff;
+                padding: 0;
+                display: block;
+                font-size: 11px;
+            }
+
+            .receipt {
+                max-width: 100%;
+                box-shadow: none;
+                border-radius: 0;
+            }
+
+            .receipt::before,
+            .receipt::after { display: none; }
+
+            .receipt__body { padding: 6px 8px 10px; }
+
+            .receipt__print-btn { display: none !important; }
+
+            .receipt__logo { height: 38px; }
+
+            .receipt__total-main-value { font-size: 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="receipt">
+
+    {% if tx %}
+
+    <div class="receipt__body">
+
+        <!-- ──────────────────── CABEÇALHO ──────────────────── -->
+        <header class="receipt__header">
+            <img
+                src="/static/images/logo-gosell.svg"
+                alt="Go Sell"
+                class="receipt__logo"
+            >
+        </header>
+
+        <!-- ──────────────────── TÍTULO DO DOC ──────────────────── -->
+        <div class="receipt__doc-title">
+            Nota de Retirada
+        </div>
+
+        <!-- ──────────────────── METADADOS ──────────────────── -->
+        <div class="receipt__meta">
+            <div class="receipt__meta-item full">
+                <span class="receipt__meta-label">Número do pedido</span>
+                <span class="receipt__meta-value">#{{ tx.order_number }}</span>
+            </div>
+            <div class="receipt__meta-item">
+                <span class="receipt__meta-label">Data</span>
+                <span class="receipt__meta-value">
+                    {% set dt_str = tx.created_at %}
+                    {% if dt_str %}
+                        {{ dt_str[:10].split('-') | reverse | join('/') }}
+                    {% else %}—{% endif %}
+                </span>
+            </div>
+            <div class="receipt__meta-item">
+                <span class="receipt__meta-label">Pagamento</span>
+                <span class="receipt__meta-value">{{ tx.payment_method | paymethod(tx.card_installments) }}</span>
+            </div>
+            <div class="receipt__meta-item">
+                <span class="receipt__meta-label">Qtd. de itens</span>
+                <span class="receipt__meta-value">{{ tx.items_count }}</span>
+            </div>
+            <div class="receipt__meta-item">
+                <span class="receipt__meta-label">Vendedor</span>
+                <span class="receipt__meta-value">{{ tx.seller_name or '—' }}</span>
+            </div>
+        </div>
+
+        <!-- ──────────────────── DADOS DO CLIENTE ──────────────────── -->
+        {% set cro = tx | cro_pedido %}
+        {% include 'partials/receipt_client_section.html' %}
+
+        <!-- ──────────────────── ITENS ──────────────────── -->
+        <div class="receipt__section">
+            <div class="receipt__section-title">Produtos</div>
+
+            <div class="receipt__items-head">
+                <span>SKU/Descrição</span>
+                <span>Unit.</span>
+                <span>Qtd.</span>
+                <span>Subtotal</span>
+            </div>
+
+            {% set items = tx['items'] %}
+            {% set tx_confirmado = (tx.status or '')|lower == 'confirmado' %}
+            {% set pending_items = [] %}
+            {% for it in items %}
+            {% set pendente = (it.quantity or 0) - (it.quantity_delivered or 0) %}
+            {% if tx_confirmado and it.product_id and pendente > 0 %}
+                {% if pending_items.append((it, pendente, loop.index)) %}{% endif %}
+            {% endif %}
+            <div class="receipt__item">
+                <span class="receipt__item-name">
+                    {{ loop.index }}.
+                    {%- if it.product_sku %} {{ it.product_sku }} -{% endif %}
+                    {{ it.product_name }}{% if it.gift_rule_id %} (BRINDE){% endif %}
+                </span>
+                <span class="receipt__item-unit">
+                    R${{ "%.2f"|format(it.unit_price|float)|replace('.', ',') }}
+                </span>
+                <span class="receipt__item-qty">{{ it.quantity }}×</span>
+                <span class="receipt__item-subtotal">
+                    {% set sub = it.subtotal | float %}
+                    R$ {{ "%.2f"|format(sub) | replace('.', ',') }}
+                </span>
+                {% if tx_confirmado and it.product_id and pendente > 0 %}
+                <span class="receipt__item-pending-tag">
+                    &#9888; {{ pendente }} un. pendente{% if pendente != 1 %}s{% endif %} de retirada
+                </span>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            {% if pending_items %}
+            <div class="receipt__pending">
+                <div class="receipt__pending-title">&#9888; Itens para retirada posterior</div>
+                {% for it, pendente, item_num in pending_items %}
+                <div class="receipt__item receipt__pending-row">
+                    <span class="receipt__item-name">
+                        {{ item_num }}.
+                        {%- if it.product_sku %} {{ it.product_sku }} -{% endif %}
+                        {{ it.product_name }}{% if it.gift_rule_id %} (BRINDE){% endif %}
+                    </span>
+                    <span class="receipt__item-unit">
+                        {% set unit = (it.unit_price | float) if it.unit_price is not none else ((it.subtotal | float) / (it.quantity | float) if (it.quantity | float) > 0 else 0) %}
+                        R$ {{ "%.2f"|format(unit) | replace('.', ',') }}
+                    </span>
+                    <span class="receipt__item-qty">{{ pendente }}×</span>
+                    <span class="receipt__item-subtotal">
+                        {% set pending_sub = unit * pendente %}
+                        R$ {{ "%.2f"|format(pending_sub) | replace('.', ',') }}
+                    </span>
+                </div>
+                {% endfor %}
+                <p class="receipt__pending-text">
+                    Estes itens já estão pagos, mas aguardam reposição de estoque.
+                    Apresente esta nota no balcão para retirá-los assim que disponíveis.
+                </p>
+            </div>
+
+            {% include 'partials/receipt_client_section.html' %}
+            {% endif %}
+        </div>
+
+        <!-- ──────────────────── TOTALIZADOR ──────────────────── -->
+        {% set ns_lista = namespace(total=0) %}
+        {% for it in items %}
+            {% set ns_lista.total = ns_lista.total + ((it.original_price or it.unit_price) | float) * (it.quantity | float) %}
+        {% endfor %}
+        {% set economia = ns_lista.total - (tx.total | float) %}
+        <div class="receipt__totals">
+            <div class="receipt__total-row">
+                <span>Forma de pagamento</span>
+                <span>Cartão (maquininha)</span>
+            </div>
+            <div class="receipt__total-row">
+                <span>Subtotal ({{ items | length }} produto{% if items | length != 1 %}s{% endif %})</span>
+                <span>R$ {{ "%.2f"|format(tx.total | float) | replace('.', ',') }}</span>
+            </div>
+            {% if economia > 0.009 %}
+            <div class="receipt__total-row">
+                <span>Desconto</span>
+                <span>-R$ {{ "%.2f"|format(economia) | replace('.', ',') }}</span>
+            </div>
+            {% endif %}
+            <div class="receipt__total-main">
+                <span class="receipt__total-main-label">Total pago</span>
+                <span class="receipt__total-main-value">
+                    R$ {{ "%.2f"|format(tx.total | float) | replace('.', ',') }}
+                </span>
+            </div>
+        </div>
+
+        <!-- ──────────────────── RODAPÉ ──────────────────── -->
+        <footer class="receipt__footer">
+            {% set obs = (tx.receipt_note or '')|trim %}
+            {% if obs %}
+            <div class="receipt__footer-obs">
+                <div class="receipt__footer-title">Observação</div>
+                <div class="receipt__footer-text">{{ obs }}</div>
+            </div>
+            {% endif %}
+            {% if pending_items %}
+            <div class="receipt__footer-title">Retirada de produtos</div>
+            <div class="receipt__footer-text">
+                Apresente esta nota no balcão da Go Sell
+                para retirar seus produtos.<br>
+                Guarde o comprovante até a entrega.
+            </div>
+            {% endif %}
+            <div class="receipt__footer-note">
+                Documento de retirada — não é nota fiscal.<br>
+                Go Sell · {{ tx.created_at[:10].split('-') | reverse | join('/') }}
+                às {{ tx.created_at[11:16] }}
+            </div>
+        </footer>
+
+    </div><!-- /.receipt__body -->
+
+    <button type="button" class="receipt__print-btn" onclick="window.print()">
+        &#128424; Imprimir nota
+    </button>
+
+    {% else %}
+
+    <div class="receipt__body">
+        <div class="receipt__not-found">
+            <div class="receipt__not-found-icon">&#128220;</div>
+            {% if receipt_error == 'invalid_link' %}
+            <h2>Link inválido</h2>
+            <p>
+                Este link da nota de retirada não é válido ou está incompleto.
+                Solicite um novo link no balcão ou pelo painel do vendedor.
+            </p>
+            {% else %}
+            <h2>Pedido não encontrado</h2>
+            <p>O código <strong>{{ order_number }}</strong> não corresponde a nenhuma transação registrada.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    {% endif %}
+
+</div><!-- /.receipt -->
+
+{% if autoprint and tx %}
+<script>
+window.addEventListener('load', function () {
+    window.setTimeout(function () { window.print(); }, 250);
+});
+</script>
+{% endif %}
+</body>
+</html>

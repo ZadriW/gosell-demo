@@ -1,0 +1,870 @@
+{% extends "admin/_layout.html" %}
+
+{# `data-filter-attrs`: atualizados pelo admin-filters.js quando o filtro é aplicado sem recarregar. #}
+{% macro event_stock_preserved_filters(filters, pagination) -%}
+<input type="hidden" name="ret_q" value="{{ filters.q }}" data-filter-attrs="ret">
+<input type="hidden" name="ret_categoria" value="{{ filters.categoria }}" data-filter-attrs="ret">
+<input type="hidden" name="ret_status" value="{{ filters.status }}" data-filter-attrs="ret">
+<input type="hidden" name="ret_entrega" value="{{ filters.entrega }}" data-filter-attrs="ret">
+<input type="hidden" name="ret_per_page" value="{{ filters.per_page }}" data-filter-attrs="ret">
+<input type="hidden" name="ret_page" value="{{ pagination.page }}" data-filter-attrs="ret">
+{%- endmacro %}
+
+{% block title %}Estoque — {{ event.name }} | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-stock-table.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+{% set op_noun_l = event|op_noun(lower=True) %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">Controle de estoque</h1>
+            <p class="admin-section__subtitle">
+                {{ stats.products_count }} produto(s) &middot;
+                {{ stats.units_in_stock }} unidade(s) &middot;
+                <strong>{{ stats.below_min }}</strong> abaixo do mínimo
+                &middot; valor: {{ stats.stock_value | brl }}
+            </p>
+        </div>
+        <div class="admin-section__header-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            <form method="post" action="{{ url_for('admin_sync_catalog_erp') }}">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost"
+                        title="Atualiza nomes, categorias, marcas, preços e imagens a partir do ERP. Estoque e operações não são alterados."
+                        onclick="return confirm('Sincronizar catálogo com o ERP?\n\nIsso atualiza nomes, categorias, marcas, preços-base e imagens.\nEstoque, vendas e promoções NÃO serão afetados.');">
+                    <i class="fa-solid fa-arrows-rotate" aria-hidden="true"></i>
+                    Sincronizar com ERP
+                </button>
+            </form>
+            <form method="post" action="{{ url_for('admin_event_cache_product_images', event_id=event.id) }}">
+                {% include 'partials/csrf_field.html' %}
+                {{ event_stock_preserved_filters(filters, pagination) }}
+                <button type="submit" class="admin-btn admin-btn--ghost"
+                        title="Baixa as fotos remotas para este computador. Use com internet antes do {{ op_noun_l }}.">
+                    <i class="fa-solid fa-images" aria-hidden="true"></i>
+                    Salvar imagens (offline)
+                </button>
+            </form>
+        </div>
+    </header>
+
+    {# ---- Adicionar produto ---- #}
+    {% if event_ops_open(event) %}
+    <div class="admin-card admin-card--form" style="margin-bottom:16px;">
+        <h2 class="admin-card__title">
+            <i class="fa-solid fa-plus" aria-hidden="true"></i>
+            Adicionar produto ao {{ op_noun_l }}
+        </h2>
+        <form method="post"
+              action="{{ url_for('admin_event_add_product', event_id=event.id) }}"
+              class="admin-card__form">
+            {% include 'partials/csrf_field.html' %}
+            {{ event_stock_preserved_filters(filters, pagination) }}
+            <div class="admin-field">
+                <label class="admin-field__label" for="add-sku">SKU ou ID do produto</label>
+                <span class="admin-filter__wrap">
+                    <input id="add-sku" type="text" name="sku_or_id"
+                           class="admin-field__input"
+                           placeholder="Ex.: 123456 ou #73106"
+                           required autocomplete="off" inputmode="text"
+                           aria-describedby="hint-add-sku">
+                </span>
+                <span id="hint-add-sku" class="admin-filter__hint">
+                    O produto será adicionado com estoque zero; use Entrada ou Inventário para abastecer.
+                </span>
+            </div>
+            <div class="admin-card__actions">
+                <button type="submit" class="admin-btn admin-btn--primary">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    Adicionar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {# ---- Importar planilha XLS ---- #}
+    <div class="admin-card admin-card--form admin-card--import-xls" style="margin-bottom:24px;">
+        <h2 class="admin-card__title">
+            <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+            Importar produtos via planilha
+        </h2>
+        <p class="admin-card__subtitle">
+            Planilha <strong>.xls</strong> ou <strong>.xlsx</strong>: as colunas são reconhecidas pelo
+            <strong>cabeçalho</strong>, em qualquer posição.
+            Código: <strong>PRODUTO</strong>, <strong>CÓDIGO</strong> ou <strong>SKU</strong>.
+            Preço: <strong>PREÇO</strong> (preferido), <strong>VALOR UNITÁRIO</strong> ou <strong>VLR. UNITÁRIO</strong>;
+            totais, custo e impostos não contam.
+            Quantidade: <strong>QUANTIDADE</strong>, <strong>QTD.</strong>, <strong>QTDE</strong>, <strong>ESTOQUE</strong>,
+            <strong>SALDO</strong> ou <strong>DISPONÍVEL</strong> (estoque mínimo não conta).
+            Planilha só de estoque não altera preços já definidos no {{ op_noun_l }}.
+            Sem cabeçalho de preço, produtos novos usam o preço-base da biblioteca.
+            Sem cabeçalho de quantidade, sobe com estoque 0. Duplicatas na planilha são somadas.
+            Se o produto já estiver no {{ op_noun_l }}, a quantidade importada é somada ao estoque atual.
+        </p>
+        <form method="post"
+              action="{{ url_for('admin_event_import_xls', event_id=event.id) }}"
+              enctype="multipart/form-data"
+              class="admin-card__form admin-import-xls-form"
+              id="formImportXls">
+            {% include 'partials/csrf_field.html' %}
+            {{ event_stock_preserved_filters(filters, pagination) }}
+            <div class="admin-field">
+                <label class="admin-field__label" for="xls-upload">Arquivo de planilha (.xls ou .xlsx)</label>
+                <div class="admin-import-xls__drop-zone" id="xlsDropZone" role="button" tabindex="0"
+                     aria-label="Clique ou arraste uma planilha .xls ou .xlsx aqui">
+                    <input id="xls-upload" type="file" name="xls_file"
+                           accept=".xls,.xlsx"
+                           class="admin-import-xls__input"
+                           aria-describedby="hint-xls-upload"
+                           required>
+                    <div class="admin-import-xls__drop-content" id="xlsDropContent">
+                        <i class="fa-solid fa-file-arrow-up admin-import-xls__icon" aria-hidden="true"></i>
+                        <span class="admin-import-xls__label">Arraste a planilha aqui ou <strong>clique para selecionar</strong></span>
+                        <span class="admin-import-xls__hint" id="xlsFileHint">Aceito: .xls e .xlsx</span>
+                    </div>
+                </div>
+                <span id="hint-xls-upload" class="admin-filter__hint">
+                    O resultado mostra quais colunas foram lidas · Sem nenhum cabeçalho: código na coluna A e quantidade na E · Máx. 5 MB.
+                </span>
+            </div>
+            <div class="admin-card__actions">
+                <button type="submit" class="admin-btn admin-btn--primary" id="xlsSubmitBtn">
+                    <i class="fa-solid fa-file-import" aria-hidden="true"></i>
+                    Importar produtos
+                </button>
+            </div>
+        </form>
+    </div>
+    {% endif %}
+
+    <form class="admin-filters" method="get" action="{{ url_for('admin_event_stock', event_id=event.id) }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter admin-filter--search">
+            <span class="admin-filter__label">Buscar</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-magnifying-glass admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ filters.q }}"
+                    placeholder="Nome, variante, SKU ou ID..."
+                    class="admin-filter__input"
+                >
+            </span>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Situação</span>
+            <select name="status" class="admin-filter__input">
+                <option value="todos" {% if filters.status == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="ok" {% if filters.status == 'ok' %}selected{% endif %}>Estoque OK</option>
+                <option value="baixo" {% if filters.status == 'baixo' %}selected{% endif %}>Abaixo do mínimo</option>
+                <option value="sem_estoque" {% if filters.status == 'sem_estoque' %}selected{% endif %}>Sem estoque</option>
+                <option value="inativo" {% if filters.status == 'inativo' %}selected{% endif %}>Inativo</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Entrega</span>
+            <select name="entrega" class="admin-filter__input">
+                <option value="todos" {% if filters.entrega == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="pendente" {% if filters.entrega == 'pendente' %}selected{% endif %}>Retirada pendente</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Por página</span>
+            <select name="per_page" class="admin-filter__input" title="Quantidade de produtos listados por requisição">
+                {% for n in allowed_per_page %}
+                <option value="{{ n }}" {% if filters.per_page == n %}selected{% endif %}>{{ n }} produtos</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <input type="hidden" name="page" value="1" aria-hidden="true">
+        <input type="hidden" name="sort" value="{{ filters.sort }}" aria-hidden="true">
+        <input type="hidden" name="dir" value="{{ filters.dir }}" aria-hidden="true">
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('admin_event_stock', event_id=event.id) }}" class="admin-btn admin-btn--ghost">Limpar</a>
+            <a class="admin-btn admin-btn--ghost"
+               data-filter-attrs="exportar"
+               href="{{ url_for('admin_event_stock_export_xlsx', event_id=event.id, q=filters.q, categoria=filters.categoria, status=filters.status, entrega=filters.entrega, sort=filters.sort, dir=filters.dir) }}"
+               title="Exportar a lista de estoque filtrada como planilha .xlsx">
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+                Exportar Planilha
+            </a>
+        </div>
+    </form>
+
+    {# ---- Tabela de produtos ----
+       Estilos em static/css/admin-stock-table.css (.admin-stockv). Os atributos
+       data-stock-* e data-bulk-* são usados pelo admin-stock-live.js (estoque,
+       preço, vendas, situação, promoção e retirada ao vivo) e pela seleção em lote. #}
+    <div class="admin-stockv__toolbar">
+        {% if event_ops_open(event) %}
+        <button type="button"
+                class="admin-btn admin-btn--primary"
+                id="bulk-stock-open-btn"
+                disabled
+                title="Selecione produtos na tabela para registrar entrada ou saída de estoque em lote">
+            <i class="fa-solid fa-boxes-packing" aria-hidden="true"></i>
+            <span id="bulk-stock-open-label">Movimentar estoque</span>
+        </button>
+        <span class="admin-stockv__toolbar-hint">Marque os produtos para registrar entrada ou saída em lote.</span>
+        {% endif %}
+        <ul class="admin-stockv__legend" aria-label="Situações do estoque">
+            <li><span class="admin-stockv__dot admin-stockv__dot--success"></span>OK</li>
+            <li><span class="admin-stockv__dot admin-stockv__dot--warn"></span>Abaixo do mínimo</li>
+            <li><span class="admin-stockv__dot admin-stockv__dot--danger"></span>Sem estoque</li>
+        </ul>
+    </div>
+
+    <div
+        id="lista"
+        class="admin-table admin-stockv"
+        role="table"
+        aria-label="Produtos do {{ op_noun_l }} {{ event.name }}"
+        data-admin-event-stock
+        data-filter-region="tabela"
+        data-op-noun-l="{{ op_noun_l }}"
+        data-api-url="{{ url_for('admin_api_event_stock', event_id=event.id, q=filters.q, categoria=filters.categoria, status=filters.status, entrega=filters.entrega, per_page=filters.per_page, page=pagination.page, sort=filters.sort, dir=filters.dir) }}"
+    >
+        {% from "macros/admin_stock_sort.html" import stock_sort_header %}
+        {% set sort_args = {'event_id': event.id, 'q': filters.q, 'categoria': filters.categoria, 'status': filters.status, 'entrega': filters.entrega, 'per_page': filters.per_page} %}
+        <div class="admin-table__head admin-stockv__head" role="row">
+            <span role="columnheader" class="admin-stockv__cell admin-stockv__cell--check">
+                {% if event_ops_open(event) %}
+                <input type="checkbox" class="admin-stockv__checkbox" id="bulk-stock-select-all"
+                       data-bulk-select-all aria-label="Selecionar todos os produtos desta página">
+                {% endif %}
+            </span>
+            <span role="columnheader" class="admin-stockv__cell">Produto</span>
+            {{ stock_sort_header('Preço', 'preco', 'admin_event_stock', sort_args, filters.sort, filters.dir, title='Preço de venda neste ' ~ op_noun_l, col_class='admin-stockv__cell admin-stockv__cell--num') }}
+            {{ stock_sort_header('Vendas', 'vendas', 'admin_event_stock', sort_args, filters.sort, filters.dir, title='Unidades vendidas neste ' ~ op_noun_l ~ ' (pedidos confirmados)', col_class='admin-stockv__cell admin-stockv__cell--center') }}
+            {{ stock_sort_header('Estoque', 'estoque', 'admin_event_stock', sort_args, filters.sort, filters.dir, col_class='admin-stockv__cell admin-stockv__cell--center') }}
+            {{ stock_sort_header('Mínimo', 'minimo', 'admin_event_stock', sort_args, filters.sort, filters.dir, col_class='admin-stockv__cell admin-stockv__cell--center') }}
+            <span role="columnheader" class="admin-stockv__cell">Situação</span>
+            <span role="columnheader" class="admin-stockv__cell admin-stockv__cell--actions" aria-label="Ações"></span>
+        </div>
+
+        {% if products %}
+            {% for p in products %}
+            {% set pending_n = p.pending_delivery_units or 0 %}
+            {% set in_promo = p.product_id in promo_product_ids %}
+            {% set promo_tip = promo_tooltips.get(p.product_id, '') %}
+            <div class="admin-stockv__row" data-product-id="{{ p.product_id }}" role="row">
+
+                <span class="admin-stockv__cell admin-stockv__cell--check">
+                    {% if event_ops_open(event) %}
+                    <input type="checkbox" class="admin-stockv__checkbox"
+                           data-bulk-select
+                           data-product-id="{{ p.product_id }}"
+                           data-product-name="{{ p.name }}"
+                           data-product-sku="{{ p.sku or '' }}"
+                           data-product-img="{{ p.image or '' }}"
+                           data-product-stock="{{ p.stock }}"
+                           aria-label="Selecionar {{ p.name }} para entrada ou saída em lote">
+                    {% endif %}
+                </span>
+
+                <span class="admin-stockv__cell admin-stockv__product">
+                    <span class="admin-stockv__thumb-wrap">
+                        {% if p.image %}
+                        <img class="admin-stock__thumb admin-stockv__thumb" src="{{ p.image }}" alt="{{ p.name }}"
+                             loading="lazy" onerror="this.style.visibility='hidden'">
+                        {% endif %}
+                    </span>
+                    <span class="admin-stockv__info">
+                        <a class="admin-stockv__name"
+                           href="{{ url_for('admin_event_stock_product', event_id=event.id, product_id=p.product_id) }}"
+                           title="{{ p.name }}">{{ p.name }}</a>
+                        {# Variante/subtítulo iguais ao nome (comum em produtos vindos do ERP) não repetem. #}
+                        {% set name_key = ((p.name or '')|lower).split()|join(' ') %}
+                        {% if p.variant_name and ((p.variant_name|lower).split()|join(' ')) != name_key %}<span class="admin-stockv__variant">{{ p.variant_name }}</span>{% endif %}
+                        {% if p.subtitle and ((p.subtitle|lower).split()|join(' ')) != name_key %}
+                        <span class="admin-stockv__subtitle" title="{{ p.subtitle }}">{{ p.subtitle }}</span>
+                        {% endif %}
+                        <span class="admin-stockv__meta">
+                            <span>SKU <code class="admin-stockv__code">{{ p.sku or '—' }}</code></span>
+                            <span class="admin-stockv__meta-sep" aria-hidden="true">·</span>
+                            <span>ID {{ p.product_id }}</span>
+                            <span class="admin-stockv__delivery"
+                                  data-stock-delivery-wrap
+                                  {% if pending_n <= 0 %}hidden{% endif %}
+                                  title="{{ pending_n }} un. aguardando retirada">
+                                <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                                <span data-stock-delivery-count>{{ pending_n }}</span>&nbsp;a retirar
+                            </span>
+                        </span>
+                    </span>
+                </span>
+
+                <span class="admin-stockv__cell admin-stockv__cell--num admin-stockv__price"
+                      data-label="Preço"
+                      data-stock-price
+                      {% if p.event_price is not none %}
+                      title="Preço personalizado neste {{ op_noun_l }}. Biblioteca: {{ p.library_price | brl }}"
+                      {% else %}
+                      title="Preço da biblioteca"
+                      {% endif %}>
+                    <span class="admin-stockv__price-value" data-stock-price-value>{{ p.price | brl }}</span>
+                    <span class="admin-stockv__price-flag" data-stock-price-flag{% if p.event_price is none %} hidden{% endif %}>preço do {{ op_noun_l }}</span>
+                </span>
+
+                <span class="admin-stockv__cell admin-stockv__cell--center admin-stockv__sales"
+                      data-label="Vendas"
+                      data-stock-sales
+                      title="Unidades vendidas neste {{ op_noun_l }} (pedidos confirmados)">{{ p.units_sold or 0 }}</span>
+
+                <span class="admin-stockv__cell admin-stockv__cell--center" data-label="Estoque">
+                    <span class="admin-stockv__qty" data-stock-qty><strong>{{ p.stock }}</strong></span>
+                </span>
+
+                <span class="admin-stockv__cell admin-stockv__cell--center admin-stockv__min" data-label="Mínimo">{{ p.min_stock }}</span>
+
+                <span class="admin-stockv__cell admin-stockv__status" data-stock-status>
+                    {% if not p.product_active %}
+                        <span class="admin-badge admin-badge--neutral" data-stock-status-badge>Inativo no catálogo</span>
+                    {% elif p.stock == 0 %}
+                        <span class="admin-badge admin-badge--danger" data-stock-status-badge>Sem estoque</span>
+                    {% elif p.min_stock > 0 and p.stock < p.min_stock %}
+                        <span class="admin-badge admin-badge--warn" data-stock-status-badge>Abaixo do mínimo</span>
+                    {% else %}
+                        <span class="admin-badge admin-badge--success" data-stock-status-badge>OK</span>
+                    {% endif %}
+                    <span class="admin-stockv__promo"
+                          data-stock-promo-badge
+                          {% if not in_promo %}hidden{% endif %}
+                          title="{{ (promo_tip or ('Produto com promoção ativa neste ' ~ op_noun_l))|e }}">
+                        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                        <span data-stock-promo-badge-text>{{ promo_names.get(p.product_id, '') }}</span>
+                    </span>
+                </span>
+
+                <span class="admin-stockv__cell admin-stockv__cell--actions admin-stockv__actions">
+                    <a class="admin-stockv__icon-btn"
+                       href="{{ url_for('admin_event_stock_product', event_id=event.id, product_id=p.product_id) }}"
+                       title="{{ 'Consultar' if not event_ops_open(event) else 'Gerenciar estoque, preço e movimentações' }}"
+                       aria-label="{{ 'Consultar' if not event_ops_open(event) else 'Gerenciar' }} {{ p.name }} no {{ op_noun_l }}">
+                        <i class="fa-solid fa-{{ 'eye' if not event_ops_open(event) else 'sliders' }}" aria-hidden="true"></i>
+                    </a>
+                    {% if event_ops_open(event) %}
+                    <form method="post"
+                          action="{{ url_for('admin_event_remove_product', event_id=event.id, product_id=p.product_id) }}"
+                          style="display:contents;">
+                        {% include 'partials/csrf_field.html' %}
+                        {{ event_stock_preserved_filters(filters, pagination) }}
+                        <button type="submit"
+                                class="admin-stockv__icon-btn admin-stockv__icon-btn--danger"
+                                title="Remover do {{ op_noun_l }}"
+                                aria-label="Remover {{ p.name }} do {{ op_noun_l }}"
+                                onclick="return confirm('Remover {{ p.name|e }} deste {{ op_noun_l }}?');">
+                            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </span>
+            </div>
+
+            {% endfor %}
+        {% else %}
+            <div class="admin-stockv__empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                {% if stats.products_count == 0 %}
+                    <p class="admin-stockv__empty-title">Nenhum produto neste {{ op_noun_l }}</p>
+                    {% if event_ops_open(event) %}
+                    <p class="admin-stockv__empty-hint">Use o formulário acima para adicionar pelo SKU ou ID, ou importe uma planilha.</p>
+                    {% endif %}
+                {% else %}
+                    <p class="admin-stockv__empty-title">Nenhum produto corresponde aos filtros</p>
+                    <p class="admin-stockv__empty-hint">Ajuste ou limpe os filtros acima.</p>
+                {% endif %}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="admin-filter-region" data-filter-region="paginacao">
+    {% if pagination.total > 0 %}
+    <nav class="admin-pagination" aria-label="Paginação da listagem de estoque do {{ op_noun_l }}">
+        <p class="admin-pagination__summary">
+            Mostrando
+            <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+            de <strong>{{ pagination.total }}</strong> produto(s)
+            · página {{ pagination.page }} de {{ pagination.total_pages }}
+        </p>
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_event_stock', event_id=event.id, q=filters.q, categoria=filters.categoria, status=filters.status, entrega=filters.entrega, per_page=filters.per_page, sort=filters.sort, dir=filters.dir, page=pagination.page - 1) }}"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_event_stock', event_id=event.id, q=filters.q, categoria=filters.categoria, status=filters.status, entrega=filters.entrega, per_page=filters.per_page, sort=filters.sort, dir=filters.dir, page=pagination.page + 1) }}"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    </div>
+</section>
+
+{% if event_ops_open(event) %}
+{# Modal de entrada de estoque em lote (fora de <section> para evitar overflow/clip) #}
+<dialog class="admin-modal admin-modal--bulk-stock" id="bulk-stock-modal" aria-labelledby="bulk-stock-modal-title" aria-modal="true">
+    <div class="admin-modal__panel">
+        <header class="admin-modal__header">
+            <h2 class="admin-modal__title" id="bulk-stock-modal-title">
+                <i class="fa-solid fa-boxes-packing" aria-hidden="true" data-bulk-mode-icon></i>
+                <span data-bulk-mode-title>Adicionar estoque em lote</span>
+            </h2>
+            <button type="button" class="admin-modal__close" id="bulk-stock-close" aria-label="Fechar modal">
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+
+        <form method="post"
+              action="{{ url_for('admin_event_stock_bulk_entry', event_id=event.id) }}"
+              data-action-entrada="{{ url_for('admin_event_stock_bulk_entry', event_id=event.id) }}"
+              data-action-saida="{{ url_for('admin_event_stock_bulk_exit', event_id=event.id) }}"
+              id="bulk-stock-form">
+            {% include 'partials/csrf_field.html' %}
+            {{ event_stock_preserved_filters(filters, pagination) }}
+
+            <div class="admin-modal__body" data-bulk-mode="entrada">
+                {# Entrada x saída: o mesmo lote selecionado, trocando ação, rótulos e limites. #}
+                <nav class="bulk-stock-modal__modes" role="tablist" aria-label="Tipo de movimentação">
+                    <a href="#bulk-stock-entrada" class="bulk-stock-modal__mode bulk-stock-modal__mode--entrada is-active"
+                       role="tab" aria-selected="true" data-bulk-mode-tab="entrada">
+                        <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+                        Entrada
+                    </a>
+                    <a href="#bulk-stock-saida" class="bulk-stock-modal__mode bulk-stock-modal__mode--saida"
+                       role="tab" aria-selected="false" tabindex="-1" data-bulk-mode-tab="saida">
+                        <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                        Saída
+                    </a>
+                </nav>
+
+                <p class="admin-modal__feedback" id="bulk-stock-feedback" hidden></p>
+
+                <div class="bulk-stock-modal__list" id="bulk-stock-list" role="table" aria-label="Produtos selecionados"></div>
+
+                <div class="admin-field">
+                    <label class="admin-field__label" for="bulk-stock-reason">Motivo / Ref.</label>
+                    <input
+                        id="bulk-stock-reason"
+                        class="admin-field__input"
+                        type="text"
+                        name="reason"
+                        maxlength="500"
+                        required
+                        placeholder="Ex.: Reposição estande — NF 8844"
+                        autocomplete="off"
+                    >
+                    <span class="admin-field__hint" data-bulk-mode-hint>Aplicado a todos os produtos selecionados nesta entrada.</span>
+                </div>
+            </div>
+
+            <div class="admin-modal__footer">
+                <button type="button" class="admin-btn admin-btn--ghost" id="bulk-stock-cancel">Cancelar</button>
+                <button type="submit" class="admin-btn admin-btn--primary" id="bulk-stock-submit">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    Adicionar estoque
+                </button>
+            </div>
+        </form>
+    </div>
+</dialog>
+{% endif %}
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-stock-live.js') }}?v=confirm1"></script>
+<script>
+(function () {
+    'use strict';
+    var zone    = document.getElementById('xlsDropZone');
+    var input   = document.getElementById('xls-upload');
+    var hint    = document.getElementById('xlsFileHint');
+    var btn     = document.getElementById('xlsSubmitBtn');
+    var form    = document.getElementById('formImportXls');
+    if (!zone || !input) return;
+
+    function setFile(name) {
+        if (name) {
+            hint.textContent = '📄 ' + name;
+            zone.classList.add('admin-import-xls__drop-zone--has-file');
+        } else {
+            hint.textContent = 'Aceito: .xls e .xlsx';
+            zone.classList.remove('admin-import-xls__drop-zone--has-file');
+        }
+    }
+
+    zone.addEventListener('click', function (e) {
+        if (e.target !== input) input.click();
+    });
+    zone.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); }
+    });
+    input.addEventListener('change', function () {
+        setFile(input.files[0] ? input.files[0].name : '');
+    });
+
+    zone.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        zone.classList.add('admin-import-xls__drop-zone--drag');
+    });
+    ['dragleave', 'dragend'].forEach(function (ev) {
+        zone.addEventListener(ev, function () {
+            zone.classList.remove('admin-import-xls__drop-zone--drag');
+        });
+    });
+    zone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        zone.classList.remove('admin-import-xls__drop-zone--drag');
+        var files = e.dataTransfer.files;
+        if (!files || !files.length) return;
+        var file = files[0];
+        var lower = file.name.toLowerCase();
+        if (!lower.endsWith('.xls') && !lower.endsWith('.xlsx')) {
+            hint.textContent = '⚠ Formato inválido. Envie um arquivo .xls ou .xlsx';
+            zone.classList.remove('admin-import-xls__drop-zone--has-file');
+            return;
+        }
+        // Transfere para o input via DataTransfer
+        try {
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            input.files = dt.files;
+            setFile(file.name);
+        } catch (_) {
+            hint.textContent = '⚠ Arraste não suportado; selecione o arquivo manualmente.';
+        }
+    });
+
+    if (form && btn) {
+        form.addEventListener('submit', function () {
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> Importando…';
+        });
+    }
+}());
+</script>
+<script>
+(function () {
+    'use strict';
+
+    var openBtn    = document.getElementById('bulk-stock-open-btn');
+    var openLabel  = document.getElementById('bulk-stock-open-label');
+    var modal      = document.getElementById('bulk-stock-modal');
+    var closeBtn   = document.getElementById('bulk-stock-close');
+    var cancelBtn  = document.getElementById('bulk-stock-cancel');
+    var listEl     = document.getElementById('bulk-stock-list');
+    var reasonIn   = document.getElementById('bulk-stock-reason');
+    var feedbackEl = document.getElementById('bulk-stock-feedback');
+    var form       = document.getElementById('bulk-stock-form');
+    var submitBtn  = document.getElementById('bulk-stock-submit');
+
+    if (!openBtn) return;
+
+    function escHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+        });
+    }
+
+    function getCheckboxes() {
+        return Array.prototype.slice.call(document.querySelectorAll('[data-bulk-select]'));
+    }
+
+    /*
+     * Seleção guardada por ID de produto, fora do DOM: aplicar filtros/paginar sem recarregar
+     * troca as linhas da tabela, mas os produtos já marcados continuam no lote.
+     */
+    var selection = new Map();
+
+    function setSelected(cb, on) {
+        var id = String(cb.dataset.productId || '');
+        if (!id) return;
+        cb.checked = on;
+        if (on) {
+            selection.set(id, {
+                id: id,
+                name: cb.dataset.productName || '',
+                sku: cb.dataset.productSku || '',
+                img: cb.dataset.productImg || '',
+                stock: parseInt(cb.dataset.productStock, 10) || 0
+            });
+        } else {
+            selection.delete(id);
+        }
+    }
+
+    /** Remarca as linhas visíveis que já estão no lote (após troca da tabela). */
+    function restoreChecks() {
+        getCheckboxes().forEach(function (cb) {
+            cb.checked = selection.has(String(cb.dataset.productId || ''));
+        });
+    }
+
+    function getChecked() {
+        return Array.from(selection.values());
+    }
+
+    /* Buscado a cada uso: o cabeçalho da tabela é trocado ao aplicar filtros sem recarregar. */
+    function getSelectAll() {
+        return document.getElementById('bulk-stock-select-all');
+    }
+
+    function updateOpenButton() {
+        var n = getChecked().length;
+        var selectAll = getSelectAll();
+        openBtn.disabled = n === 0;
+        openLabel.textContent = n > 0 ? ('Movimentar estoque (' + n + ')') : 'Movimentar estoque';
+        if (selectAll) {
+            var all = getCheckboxes();
+            var visibleChecked = all.filter(function (cb) { return cb.checked; }).length;
+            selectAll.checked = all.length > 0 && visibleChecked === all.length;
+            selectAll.indeterminate = visibleChecked > 0 && visibleChecked < all.length;
+        }
+    }
+
+    document.addEventListener('change', function (e) {
+        if (!e.target.matches) return;
+        if (e.target === getSelectAll()) {
+            getCheckboxes().forEach(function (cb) { setSelected(cb, e.target.checked); });
+            updateOpenButton();
+        } else if (e.target.matches('[data-bulk-select]')) {
+            setSelected(e.target, e.target.checked);
+            updateOpenButton();
+        }
+    });
+
+    document.addEventListener('totem:admin-filter-updated', function () {
+        restoreChecks();
+        updateOpenButton();
+    });
+    getCheckboxes().forEach(function (cb) { if (cb.checked) setSelected(cb, true); });
+
+    function hideFeedback() {
+        if (!feedbackEl) return;
+        feedbackEl.textContent = '';
+        feedbackEl.setAttribute('hidden', '');
+        feedbackEl.classList.remove('admin-modal__feedback--error', 'admin-modal__feedback--success');
+    }
+
+    function showFeedbackError(msg) {
+        if (!feedbackEl) return;
+        feedbackEl.textContent = msg;
+        feedbackEl.classList.remove('admin-modal__feedback--success');
+        feedbackEl.classList.add('admin-modal__feedback--error');
+        feedbackEl.removeAttribute('hidden');
+    }
+
+    function productThumbHtml(img, name) {
+        if (img) {
+            return '<img class="admin-modal__product-thumb bulk-stock-modal__thumb" src="' +
+                escHtml(img) + '" alt="' + escHtml(name) + '">';
+        }
+        return '<span class="admin-modal__product-thumb bulk-stock-modal__thumb bulk-stock-modal__thumb--empty" aria-hidden="true">' +
+            '<i class="fa-regular fa-image"></i></span>';
+    }
+
+    /* ---- Modo do modal: entrada x saída (mesmo lote, ação e limites diferentes) ---- */
+    var MODES = {
+        entrada: {
+            title: 'Adicionar estoque em lote',
+            icon: 'fa-solid fa-boxes-packing',
+            hint: 'Aplicado a todos os produtos selecionados nesta entrada.',
+            placeholder: 'Ex.: Reposição estande — NF 8844',
+            submit: '<i class="fa-solid fa-plus" aria-hidden="true"></i> Adicionar estoque',
+            submitClass: 'admin-btn admin-btn--primary',
+            busy: 'Adicionando…'
+        },
+        saida: {
+            title: 'Saída de estoque em lote',
+            icon: 'fa-solid fa-dolly',
+            hint: 'Aplicado a todos os produtos selecionados nesta saída. A quantidade não pode passar do estoque atual.',
+            placeholder: 'Ex.: Avaria, devolução ao CD, transferência',
+            submit: '<i class="fa-solid fa-minus" aria-hidden="true"></i> Registrar saída',
+            submitClass: 'admin-btn admin-btn--danger-solid',
+            busy: 'Registrando saída…'
+        }
+    };
+    var modeBody  = modal ? modal.querySelector('[data-bulk-mode]') : null;
+    var modeTabs  = modal ? Array.prototype.slice.call(modal.querySelectorAll('[data-bulk-mode-tab]')) : [];
+    var modeTitle = modal ? modal.querySelector('[data-bulk-mode-title]') : null;
+    var modeIcon  = modal ? modal.querySelector('[data-bulk-mode-icon]') : null;
+    var modeHint  = modal ? modal.querySelector('[data-bulk-mode-hint]') : null;
+    var currentMode = 'entrada';
+
+    /** Estoque atual: a célula da linha (atualizada ao vivo) quando visível; senão o valor da seleção. */
+    function currentStock(item) {
+        var cell = document.querySelector('[data-filter-region="tabela"] .admin-stockv__row[data-product-id="' + item.id + '"] [data-stock-qty]');
+        var live = cell ? parseInt(cell.textContent.replace(/[^\d-]/g, ''), 10) : NaN;
+        return Number.isFinite(live) ? live : item.stock;
+    }
+
+    function syncRowsToMode() {
+        var exit = currentMode === 'saida';
+        listEl.querySelectorAll('.bulk-stock-modal__row').forEach(function (row) {
+            var item = selection.get(row.dataset.productId);
+            var stock = item ? currentStock(item) : 0;
+            var qty = row.querySelector('[data-bulk-qty]');
+            var stockEl = row.querySelector('[data-bulk-stock]');
+            if (stockEl) stockEl.textContent = 'Estoque atual: ' + stock + ' un.';
+            row.classList.toggle('bulk-stock-modal__row--no-stock', exit && stock <= 0);
+            if (!qty) return;
+            if (exit) qty.max = String(Math.max(stock, 0));
+            else qty.removeAttribute('max');
+        });
+    }
+
+    function setMode(mode) {
+        if (!MODES[mode]) return;
+        currentMode = mode;
+        var cfg = MODES[mode];
+        if (modeBody) modeBody.setAttribute('data-bulk-mode', mode);
+        modeTabs.forEach(function (tab) {
+            var on = tab.getAttribute('data-bulk-mode-tab') === mode;
+            tab.classList.toggle('is-active', on);
+            tab.setAttribute('aria-selected', String(on));
+            tab.setAttribute('tabindex', on ? '0' : '-1');
+        });
+        if (form) form.setAttribute('action', form.getAttribute('data-action-' + mode));
+        if (modeTitle) modeTitle.textContent = cfg.title;
+        if (modeIcon) modeIcon.className = cfg.icon;
+        if (modeHint) modeHint.textContent = cfg.hint;
+        if (reasonIn) reasonIn.placeholder = cfg.placeholder;
+        if (submitBtn) {
+            submitBtn.className = cfg.submitClass;
+            submitBtn.innerHTML = cfg.submit;
+        }
+        hideFeedback();
+        syncRowsToMode();
+    }
+
+    modeTabs.forEach(function (tab) {
+        tab.addEventListener('click', function (e) {
+            e.preventDefault();
+            setMode(tab.getAttribute('data-bulk-mode-tab'));
+        });
+        tab.addEventListener('keydown', function (e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            e.preventDefault();
+            var next = currentMode === 'entrada' ? 'saida' : 'entrada';
+            setMode(next);
+            modal.querySelector('[data-bulk-mode-tab="' + next + '"]').focus();
+        });
+    });
+
+    function buildRow(item) {
+        var id   = item.id;
+        var name = item.name || ('Produto #' + id);
+        var sku  = item.sku;
+        var img  = item.img;
+        var row = document.createElement('div');
+        row.className = 'bulk-stock-modal__row';
+        row.dataset.productId = id;
+        row.innerHTML =
+            '<input type="hidden" name="product_ids" value="' + escHtml(id) + '">' +
+            productThumbHtml(img, name) +
+            '<span class="bulk-stock-modal__row-info">' +
+                '<strong>' + escHtml(name) + '</strong>' +
+                (sku ? '<small>SKU: ' + escHtml(sku) + '</small>' : '') +
+                '<small class="bulk-stock-modal__row-stock" data-bulk-stock></small>' +
+            '</span>' +
+            '<span class="admin-field bulk-stock-modal__row-qty">' +
+                '<label class="admin-field__label" for="bulk-stock-qty-' + escHtml(id) + '">Quantidade</label>' +
+                '<input id="bulk-stock-qty-' + escHtml(id) + '" class="admin-field__input" type="number" ' +
+                'name="qty_' + escHtml(id) + '" min="1" step="1" value="1" required data-bulk-qty>' +
+            '</span>';
+        return row;
+    }
+
+    function openModal() {
+        var checked = getChecked();
+        if (!checked.length) return;
+        listEl.innerHTML = '';
+        checked.forEach(function (item) { listEl.appendChild(buildRow(item)); });
+        listEl.classList.toggle('bulk-stock-modal__list--scroll', listEl.children.length >= 5);
+        if (reasonIn) reasonIn.value = '';
+        setMode('entrada');
+        modal.showModal();
+        if (reasonIn) reasonIn.focus();
+    }
+
+    function closeModal() {
+        modal.close();
+        hideFeedback();
+    }
+
+    openBtn.addEventListener('click', openModal);
+    if (closeBtn)  closeBtn.addEventListener('click', closeModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    modal.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            hideFeedback();
+            if (!listEl.children.length) {
+                e.preventDefault();
+                showFeedbackError('Selecione ao menos um produto.');
+                return;
+            }
+            if (currentMode === 'saida') {
+                syncRowsToMode();
+                var over = Array.prototype.slice.call(listEl.querySelectorAll('[data-bulk-qty]')).find(function (input) {
+                    return (parseInt(input.value, 10) || 0) > (parseInt(input.max, 10) || 0);
+                });
+                if (over) {
+                    e.preventDefault();
+                    var name = over.closest('.bulk-stock-modal__row').querySelector('strong').textContent;
+                    showFeedbackError('A saída de "' + name + '" passa do estoque atual (' + (over.max || 0) + ' un.).');
+                    over.focus();
+                    return;
+                }
+            }
+            if (!reasonIn || !reasonIn.value.trim()) {
+                e.preventDefault();
+                showFeedbackError('Informe o Motivo / Ref.');
+                if (reasonIn) reasonIn.focus();
+                return;
+            }
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i> ' + MODES[currentMode].busy;
+            }
+        });
+    }
+
+    updateOpenButton();
+}());
+</script>
+{% endblock %}

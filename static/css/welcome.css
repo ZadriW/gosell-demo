@@ -1,0 +1,202 @@
+.welcome {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 24px;
+    background: var(--color-bg);
+    position: relative;
+    overflow: hidden;
+}
+
+
+.welcome__card {
+    position: relative;
+    z-index: 1;
+    background: var(--color-surface);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    padding: 72px 88px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 36px;
+    max-width: 620px;
+    width: 100%;
+    animation: fadeInUp 500ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.welcome__logo {
+    width: 340px;
+    max-width: 100%;
+    height: auto;
+    user-select: none;
+}
+
+.welcome__tagline {
+    color: var(--color-text-muted);
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    text-align: center;
+}
+
+.welcome__access {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    width: 100%;
+    max-width: 420px;
+}
+
+.welcome__access-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 22px 28px;
+    border-radius: var(--radius-pill);
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: transform var(--transition), box-shadow var(--transition),
+        background var(--transition), border-color var(--transition), color var(--transition);
+    min-height: 58px;
+    text-align: center;
+}
+
+.welcome__access-btn i {
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.welcome__access-btn--seller {
+    background: var(--color-primary);
+    color: #ffffff;
+    border: 2px solid transparent;
+    box-shadow: 0 10px 26px rgba(14, 116, 144, 0.28);
+}
+
+.welcome__access-btn--seller:hover,
+.welcome__access-btn--seller:focus-visible {
+    background: var(--color-primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 34px rgba(14, 116, 144, 0.36);
+    outline: none;
+}
+
+.welcome__access-btn--seller:active {
+    transform: translateY(0);
+    background: var(--color-primary-dark);
+}
+
+/* "Fazer login com usuário diferente" (só aparece com alguém logado). */
+.welcome__switch {
+    align-self: center;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    transition: color var(--transition);
+}
+
+.welcome__switch:hover,
+.welcome__switch:focus-visible {
+    color: var(--color-primary);
+}
+
+.welcome__access-btn--admin {
+    background: var(--color-surface);
+    color: var(--color-primary);
+    border: 2px solid var(--color-primary);
+    box-shadow: 0 8px 22px rgba(14, 116, 144, 0.12);
+}
+
+.welcome__access-btn--admin:hover,
+.welcome__access-btn--admin:focus-visible {
+    background: rgba(14, 116, 144, 0.06);
+    color: var(--color-primary-light);
+    border-color: var(--color-primary-light);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 28px rgba(14, 116, 144, 0.16);
+    outline: none;
+}
+
+.welcome__access-btn--admin:active {
+    transform: translateY(0);
+    background: rgba(14, 116, 144, 0.1);
+    color: var(--color-primary-dark);
+    border-color: var(--color-primary-dark);
+}
+
+.welcome__footer {
+    position: relative;
+    z-index: 1;
+    margin-top: 40px;
+    color: var(--color-text-muted);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 640px) {
+    .welcome__card {
+        padding: 48px 28px;
+    }
+    .welcome__logo {
+        width: 240px;
+    }
+    .welcome__access {
+        max-width: none;
+    }
+    .welcome__access-btn {
+        padding: 18px 22px;
+        font-size: 16px;
+        min-height: 54px;
+    }
+}
+
+/* Contas da demonstração (tela inicial). */
+.welcome__credentials {
+    width: 100%;
+    max-width: 420px;
+    padding: 16px 18px;
+    border-radius: var(--radius-md);
+    background: rgba(14, 116, 144, 0.06);
+    border: 1px solid rgba(14, 116, 144, 0.16);
+    text-align: left;
+}
+
+.welcome__credentials-title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-primary);
+    margin-bottom: 8px;
+}
+
+.welcome__credentials-list {
+    list-style: none;
+    color: var(--color-text);
+    font-size: 14px;
+    line-height: 1.6;
+}

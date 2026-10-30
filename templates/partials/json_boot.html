@@ -1,0 +1,4 @@
+{# Payload em JSON (não em JS) para evitar XSS via interpolação em <script>.
+   Expecta ``boot_payload``: dict cujas chaves viram propriedades de ``window``. #}
+<script type="application/json" id="totem-page-boot">{{ boot_payload | tojson }}</script>
+<script src="{{ url_for('static', filename='js/totem-page-boot.js') }}"></script>

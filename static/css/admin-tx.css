@@ -1,0 +1,958 @@
+/* Histórico de transações do evento — templates/admin/partials/event_transactions_live.html
+   Tudo sob .admin-txv. O painel do vendedor (seller/dashboard.html) usa a mesma
+   lista na variante .admin-txv--seller, no fim do arquivo. */
+
+.admin-txv {
+    --txv-success: #0c8a4d;
+    --txv-success-bg: rgba(15, 157, 88, 0.11);
+    --txv-teal: #0f766e;
+    --txv-teal-bg: rgba(13, 148, 136, 0.12);
+    --txv-info: #1d4ed8;
+    --txv-info-bg: rgba(37, 99, 235, 0.10);
+    --txv-warn: #a5620a;
+    --txv-warn-bg: rgba(232, 137, 11, 0.13);
+    --txv-danger: #b91c1c;
+    --txv-danger-bg: rgba(220, 38, 38, 0.09);
+    --txv-neutral: var(--color-text-muted);
+    --txv-neutral-bg: var(--color-bg);
+    --txv-row-hover: rgba(14, 116, 144, 0.025);
+    --txv-row-open: rgba(14, 116, 144, 0.04);
+    --txv-cols: 28px minmax(140px, 1.15fr) minmax(84px, 0.6fr) 48px minmax(96px, 0.7fr)
+                minmax(120px, 0.9fr) minmax(128px, 0.95fr) minmax(220px, 1.9fr) 112px;
+
+    border: 1px solid var(--color-border);
+    font-size: 13.5px;
+}
+
+html.admin-theme--dark .admin-txv {
+    --txv-success: var(--admin-success);
+    --txv-success-bg: var(--admin-success-bg);
+    --txv-teal: #5eead4;
+    --txv-teal-bg: rgba(94, 234, 212, 0.12);
+    --txv-info: var(--admin-info);
+    --txv-info-bg: var(--admin-info-bg);
+    --txv-warn: var(--admin-warn);
+    --txv-warn-bg: var(--admin-warn-bg);
+    --txv-danger: var(--admin-danger);
+    --txv-danger-bg: var(--admin-danger-bg);
+    --txv-neutral-bg: rgba(255, 255, 255, 0.05);
+    --txv-row-hover: rgba(255, 255, 255, 0.025);
+    --txv-row-open: rgba(240, 192, 48, 0.05);
+}
+
+/* ---------- Barra acima da tabela ---------- */
+.admin-txv__toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 20px;
+    margin: 10px 0 12px;
+}
+
+.admin-txv__count {
+    margin: 0;
+    font-size: 13.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__count strong {
+    color: var(--color-text);
+    font-size: 15px;
+}
+
+.admin-txv__count-sep {
+    margin: 0 4px;
+    opacity: 0.6;
+}
+
+.admin-txv__legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__legend li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-txv__legend-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 7px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    font-size: 11px;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__legend-icon--handover { color: #0c8a4d; }
+.admin-txv__legend-icon--danger { color: #b91c1c; }
+
+/* ---------- Grade (cabeçalho e linhas) ---------- */
+.admin-txv > .admin-txv__head,
+.admin-txv .admin-txv__row {
+    display: grid;
+    grid-template-columns: var(--txv-cols);
+    column-gap: 14px;
+    align-items: center;
+}
+
+.admin-txv > .admin-txv__head {
+    padding: 11px 18px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__head .admin-table__sort-toggle {
+    color: inherit;
+}
+
+.admin-txv__cell {
+    min-width: 0;
+}
+
+.admin-txv__cell--num {
+    text-align: right;
+    justify-content: flex-end;
+}
+
+.admin-txv__cell--center {
+    text-align: center;
+    justify-content: center;
+}
+
+.admin-txv__head .admin-txv__cell--num,
+.admin-txv__head .admin-txv__cell--center {
+    display: flex;
+}
+
+/* ---------- Linha ---------- */
+.admin-txv .admin-txv__tx {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.admin-txv .admin-txv__tx:last-child {
+    border-bottom: none;
+}
+
+.admin-txv .admin-txv__row {
+    position: relative;
+    padding: 13px 18px;
+    min-height: 64px;
+    transition: background var(--transition, 160ms);
+}
+
+/* Faixa da situação à esquerda */
+.admin-txv .admin-txv__row::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 10px;
+    bottom: 10px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--txv-accent, transparent);
+    transition: top var(--transition, 160ms), bottom var(--transition, 160ms);
+}
+
+.admin-txv__row--confirmado { --txv-accent: var(--txv-success); }
+.admin-txv__row--entregue { --txv-accent: var(--txv-teal); }
+.admin-txv__row--pendente { --txv-accent: var(--txv-warn); }
+.admin-txv__row--cancelado { --txv-accent: var(--txv-danger); }
+.admin-txv__row--estornado { --txv-accent: var(--color-border); }
+
+.admin-txv .admin-txv__row:hover {
+    background: var(--txv-row-hover);
+}
+
+.admin-txv .admin-txv__row.is-open {
+    background: var(--txv-row-open);
+}
+
+.admin-txv .admin-txv__row.is-open::before {
+    top: 0;
+    bottom: 0;
+    border-radius: 0;
+}
+
+.admin-txv .admin-txv__row:focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -2px;
+}
+
+/* Venda que não conta (cancelada/estornada): texto apagado */
+.admin-txv__row--cancelado .admin-txv__order-number,
+.admin-txv__row--cancelado .admin-txv__total,
+.admin-txv__row--estornado .admin-txv__order-number,
+.admin-txv__row--estornado .admin-txv__total {
+    color: var(--color-text-muted);
+}
+
+.admin-txv__row--cancelado .admin-txv__total,
+.admin-txv__row--estornado .admin-txv__total {
+    text-decoration: line-through;
+    text-decoration-color: rgba(128, 128, 128, 0.6);
+    font-weight: 600;
+}
+
+.admin-txv__cell--toggle {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    transition: background var(--transition, 160ms);
+}
+
+.admin-txv .admin-txv__row:hover .admin-txv__cell--toggle {
+    background: var(--txv-neutral-bg);
+}
+
+.admin-txv .admin-tx__chevron {
+    font-size: 11px;
+}
+
+/* Pedido + cliente */
+.admin-txv__order {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.admin-txv__order-ref {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.admin-txv__order-number {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--color-primary);
+    letter-spacing: 0.01em;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-txv .admin-txv__copy {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    opacity: 0.45;
+    transition: opacity var(--transition, 160ms);
+}
+
+.admin-txv .admin-txv__row:hover .admin-txv__copy,
+.admin-txv .admin-txv__copy:focus-visible,
+.admin-txv .admin-txv__copy.is-done {
+    opacity: 1;
+}
+
+.admin-txv__client {
+    font-size: 12.5px;
+    color: var(--color-text);
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Data */
+.admin-txv__date {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-txv__date-day {
+    color: var(--color-text);
+    font-weight: 500;
+}
+
+.admin-txv__date-time {
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+/* Itens */
+.admin-txv__qty {
+    display: inline-grid;
+    place-items: center;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 12.5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Total */
+.admin-txv__total {
+    font-weight: 700;
+    font-size: 14.5px;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Pagamento */
+.admin-txv__pay {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--color-text);
+    min-width: 0;
+}
+
+.admin-txv__pay > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.admin-txv__pay-icon {
+    width: 16px;
+    text-align: center;
+    color: var(--color-text-muted);
+    flex-shrink: 0;
+}
+
+/* Vendedor */
+.admin-txv__seller {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+}
+
+.admin-txv__avatar {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--admin-tint, rgba(14, 116, 144, 0.08));
+    color: var(--color-primary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+html:not(.admin-theme--dark) .admin-txv__avatar {
+    background: rgba(14, 116, 144, 0.08);
+}
+
+.admin-txv__seller-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text);
+}
+
+.admin-txv__muted {
+    color: var(--color-text-muted);
+}
+
+/* Situação: selo principal + marcadores na mesma linha (quebra só sem espaço) */
+.admin-txv__status {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+
+.admin-txv__status .admin-txv__chips {
+    display: contents;
+}
+
+.admin-txv__pill,
+.admin-txv__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 999px;
+    white-space: nowrap;
+    text-decoration: none;
+}
+
+.admin-txv__pill {
+    padding: 4px 11px 4px 9px;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.admin-txv__pill i {
+    font-size: 11px;
+}
+
+.admin-txv__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.admin-txv__chip {
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    border: 1px solid transparent;
+}
+
+.admin-txv__chip i {
+    font-size: 10px;
+}
+
+a.admin-txv__chip:hover {
+    border-color: currentColor;
+}
+
+.admin-txv__pill--success, .admin-txv__chip--success { background: var(--txv-success-bg); color: var(--txv-success); }
+.admin-txv__pill--teal, .admin-txv__chip--teal { background: var(--txv-teal-bg); color: var(--txv-teal); }
+.admin-txv__pill--info, .admin-txv__chip--info { background: var(--txv-info-bg); color: var(--txv-info); }
+.admin-txv__pill--warn, .admin-txv__chip--warn { background: var(--txv-warn-bg); color: var(--txv-warn); }
+.admin-txv__pill--danger, .admin-txv__chip--danger { background: var(--txv-danger-bg); color: var(--txv-danger); }
+.admin-txv__pill--neutral, .admin-txv__chip--neutral { background: var(--txv-neutral-bg); color: var(--txv-neutral); }
+
+/* Ações rápidas: botões quadrados do mesmo tamanho */
+.admin-txv__actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+}
+
+.admin-txv__actions form {
+    display: contents;
+}
+
+/* (0,3,0): vence as regras de celular do admin.css que posicionam a nota em absoluto */
+.admin-txv .admin-txv__actions .admin-tx__handover-btn,
+.admin-txv .admin-txv__actions .admin-mov__note-btn,
+.admin-txv .admin-txv__actions .admin-txv__pdf-btn,
+.admin-txv .admin-txv__actions .admin-tx__discard-cart {
+    position: static;
+    display: inline-grid;
+    place-items: center;
+    justify-content: center !important;
+    align-items: center !important;
+    width: 32px;
+    height: 32px;
+    margin: 0;
+    padding: 0;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 13px;
+    cursor: pointer;
+    box-shadow: none;
+    transition: border-color var(--transition, 160ms), color var(--transition, 160ms),
+                background var(--transition, 160ms);
+}
+
+.admin-txv .admin-txv__actions .admin-tx__handover-btn i,
+.admin-txv .admin-txv__actions .admin-mov__note-btn i,
+.admin-txv .admin-txv__actions .admin-txv__pdf-btn i {
+    font-size: 13px;
+}
+
+.admin-txv__actions .admin-tx__handover-btn:hover {
+    border-color: var(--txv-success);
+    color: var(--txv-success);
+    background: var(--txv-success-bg);
+}
+
+.admin-txv__actions .admin-mov__note-btn:hover,
+.admin-txv__actions .admin-txv__pdf-btn:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.admin-txv .admin-txv__actions .admin-tx__discard-cart {
+    color: var(--txv-danger);
+}
+
+.admin-txv .admin-txv__actions .admin-tx__handover-btn {
+    color: var(--txv-success);
+}
+
+.admin-txv__actions .admin-tx__discard-cart:hover {
+    border-color: var(--txv-danger);
+    background: var(--txv-danger-bg);
+}
+
+/* "Entregue" já está no selo da situação */
+.admin-txv__actions .admin-tx__handover-done {
+    display: none;
+}
+
+/* ---------- Painel de detalhes ---------- */
+.admin-txv .admin-txv__details {
+    border-top: 1px solid var(--color-border);
+    background: var(--txv-row-open);
+}
+
+.admin-txv .admin-txv__details-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 330px);
+    gap: 20px;
+    padding: 18px 18px 22px 60px;
+}
+
+.admin-txv__details-main,
+.admin-txv__details-aside {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+
+.admin-txv__block-title,
+.admin-txv .admin-tx__details-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__block-title > i {
+    font-size: 12px;
+    color: var(--color-primary);
+    opacity: 0.85;
+}
+
+.admin-txv__block-count {
+    margin-left: 2px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+/* Itens */
+.admin-txv .admin-tx__items {
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-txv .admin-tx__items-head {
+    padding: 9px 14px;
+    font-size: 10.5px;
+}
+
+.admin-txv .admin-tx__items-row {
+    padding: 11px 14px;
+    font-size: 13px;
+}
+
+.admin-txv .admin-tx__items-row + .admin-tx__items-row {
+    border-top-style: solid;
+}
+
+.admin-txv .admin-tx__sku-view code {
+    padding: 2px 6px;
+    border-radius: 6px;
+    background: var(--txv-neutral-bg);
+    font-size: 11.5px;
+}
+
+.admin-txv .admin-tx__category {
+    color: var(--color-text-muted);
+}
+
+/* Retirada pendente e cliente */
+.admin-txv .admin-tx__delivery {
+    margin: 0;
+    border-radius: 12px;
+}
+
+.admin-txv__block--client:empty {
+    display: none;
+}
+
+.admin-txv .admin-tx__client {
+    border-radius: 12px;
+    background: var(--color-surface);
+}
+
+/* Lateral: cartões */
+.admin-txv__card {
+    padding: 14px 16px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-txv .admin-txv__summary {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+
+.admin-txv .admin-txv__summary .admin-tx__summary-row {
+    padding: 5px 0;
+    font-size: 13px;
+}
+
+.admin-txv .admin-txv__summary .admin-tx__summary-row > span {
+    color: var(--color-text-muted);
+}
+
+.admin-txv .admin-txv__summary .admin-tx__summary-row--total {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--color-border);
+}
+
+.admin-txv .admin-txv__summary .admin-tx__summary-row--total > span {
+    color: var(--color-text);
+    font-weight: 700;
+}
+
+.admin-txv .admin-txv__summary .admin-tx__summary-row--total strong {
+    font-size: 19px;
+}
+
+.admin-txv__code {
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--txv-neutral-bg);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+}
+
+.admin-txv__erp-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 0 0 10px;
+}
+
+.admin-txv__erp-id {
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__erp-id strong {
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-txv__erp-id--link {
+    text-decoration: underline dotted;
+    text-underline-offset: 3px;
+}
+
+.admin-txv__erp-id--link:hover strong,
+.admin-txv__erp-id--link:focus-visible strong {
+    color: var(--color-primary, currentColor);
+}
+
+.admin-txv__erp-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.admin-txv__erp-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* Observação na nota */
+.admin-txv__note-empty {
+    margin: 0 0 10px;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.admin-txv__card--note .admin-tx__note {
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+}
+
+.admin-txv__card--note .admin-tx__note-preview {
+    display: block;
+    margin: 0 0 10px;
+    padding: 9px 12px;
+    border-left: 3px solid var(--color-primary);
+    border-radius: 0 8px 8px 0;
+    background: var(--txv-neutral-bg);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--color-text);
+}
+
+.admin-txv__card--note .admin-tx__note-preview i {
+    display: none;
+}
+
+.admin-txv__card--note .admin-tx__note-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+/* Ações destrutivas no fim da lateral */
+.admin-txv .admin-txv__danger-zone {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 0;
+    padding: 12px 0 0;
+    border-top: 1px dashed var(--color-border);
+}
+
+.admin-txv .admin-txv__danger-zone form {
+    margin: 0;
+}
+
+/* Vazio */
+.admin-txv__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 44px 18px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.admin-txv__empty > i {
+    font-size: 28px;
+    opacity: 0.5;
+    margin-bottom: 6px;
+}
+
+.admin-txv__empty-title {
+    margin: 0;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.admin-txv__empty-hint {
+    margin: 0;
+    font-size: 13px;
+}
+
+/* Paginação */
+.admin-txv__pagination .admin-pagination__nav {
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-txv__page {
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+/* ---------- Telas médias: some Itens e Pagamento (estão no detalhe) ---------- */
+@media (max-width: 1240px) {
+    .admin-txv {
+        --txv-cols: 28px minmax(140px, 1.2fr) minmax(84px, 0.65fr) minmax(96px, 0.75fr)
+                    minmax(120px, 0.95fr) minmax(200px, 1.7fr) 112px;
+    }
+
+    .admin-txv__head > :nth-child(4),
+    .admin-txv__head > :nth-child(6),
+    .admin-txv .admin-txv__items-count,
+    .admin-txv .admin-txv__row > .admin-txv__pay {
+        display: none;
+    }
+
+    .admin-txv .admin-txv__details-grid {
+        grid-template-columns: minmax(0, 1fr) minmax(240px, 290px);
+        padding-left: 18px;
+    }
+}
+
+/* ---------- Celular e tablet estreito: cada venda vira um cartão ---------- */
+@media (max-width: 900px) {
+    .admin-txv {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .admin-txv > .admin-txv__head {
+        display: none;
+    }
+
+    .admin-txv .admin-txv__tx {
+        margin-bottom: 10px;
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+        overflow: hidden;
+    }
+
+    .admin-txv .admin-txv__tx:last-child {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    .admin-txv .admin-txv__row,
+    .admin-txv .admin-txv__row:not(.is-open) {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr) auto;
+        grid-template-areas:
+            "toggle order  total"
+            "toggle date   seller"
+            "toggle status actions";
+        gap: 8px 12px;
+        padding: 14px 14px 14px 12px;
+        align-items: center;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__cell--toggle {
+        grid-area: toggle;
+        position: static;
+        transform: none;
+        align-self: start;
+        margin-top: 1px;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__order { grid-area: order; }
+    .admin-txv .admin-txv__row > .admin-txv__total { grid-area: total; }
+
+    .admin-txv .admin-txv__row > .admin-txv__date {
+        grid-area: date;
+        flex-direction: row;
+        gap: 6px;
+        font-size: 12px;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__date .admin-txv__date-day {
+        font-weight: 400;
+        color: var(--color-text-muted);
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__seller {
+        grid-area: seller;
+        justify-self: end;
+        font-size: 12px;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__seller .admin-txv__avatar {
+        width: 22px;
+        height: 22px;
+        font-size: 9.5px;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__status {
+        grid-area: status;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__actions {
+        grid-area: actions;
+        position: static;
+    }
+
+    .admin-txv .admin-txv__row > .admin-txv__items-count,
+    .admin-txv .admin-txv__row > .admin-txv__pay {
+        display: none !important;
+    }
+
+    .admin-txv .admin-txv__row::before {
+        top: 14px;
+        bottom: 14px;
+    }
+
+    .admin-txv .admin-txv__details-grid {
+        grid-template-columns: minmax(0, 1fr);
+        padding: 14px;
+    }
+}
+
+/* ==========================================================================
+   Painel do vendedor — templates/seller/dashboard.html (.admin-txv--seller)
+   A mesma lista, sem a coluna Vendedor (são as vendas do próprio vendedor) e
+   com o atalho "Refazer carrinho" nos pedidos pendentes.
+   ========================================================================== */
+.admin-txv.admin-txv--seller {
+    --txv-cols: 28px minmax(150px, 1.25fr) minmax(84px, 0.6fr) 48px minmax(96px, 0.7fr)
+                minmax(130px, 1fr) minmax(220px, 1.9fr) 112px;
+}
+
+.admin-txv .admin-txv__actions .admin-tx__restore-cart {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-primary);
+}
+
+.admin-txv .admin-txv__actions .admin-tx__restore-cart:hover {
+    border-color: var(--color-primary);
+    background: rgba(14, 116, 144, 0.07);
+}
+
+.admin-txv__legend-icon--restore { color: var(--color-primary); }
+
+html.admin-theme--dark .admin-txv .admin-txv__actions .admin-tx__restore-cart:hover {
+    background: var(--admin-tint, rgba(240, 192, 48, 0.12));
+}
+
+@media (max-width: 1240px) {
+    .admin-txv.admin-txv--seller {
+        --txv-cols: 28px minmax(150px, 1.25fr) minmax(84px, 0.65fr) minmax(96px, 0.75fr)
+                    minmax(200px, 1.7fr) 112px;
+    }
+}
+
+@media (max-width: 900px) {
+    /* No cartão, a forma de pagamento ocupa o lugar do vendedor */
+    .admin-txv.admin-txv--seller .admin-txv__row > .admin-txv__pay {
+        display: inline-flex !important;
+        grid-area: seller;
+        justify-self: end;
+        font-size: 12px;
+    }
+}

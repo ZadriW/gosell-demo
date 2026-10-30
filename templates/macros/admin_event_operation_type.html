@@ -1,0 +1,16 @@
+{% macro event_operation_type_field(field_id, selected='evento') %}
+<div class="admin-field">
+    <label class="admin-field__label" for="{{ field_id }}">Tipo de operação <span aria-hidden="true">*</span></label>
+    <select
+        id="{{ field_id }}"
+        name="operation_type"
+        class="admin-field__input"
+        required
+    >
+        {% for value, label in event_operation_types %}
+        <option value="{{ value }}" {% if (selected or 'evento') == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <p class="admin-field__hint">Classifica a operação no painel (evento, congresso ou stand). O fluxo de vendas e estoque é o mesmo.</p>
+</div>
+{% endmacro %}

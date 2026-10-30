@@ -1,0 +1,32 @@
+{#
+    Cabeçalho numérico ordenável: um único alternador cíclico.
+    Cinza, seta para cima = sem ordenação · Azul, seta para cima = maior primeiro ·
+    Vermelho, seta para baixo = menor primeiro. Clicar avança para o próximo estado.
+#}
+{% macro stock_sort_header(label, field, endpoint, args, current_sort, current_dir, title=none, col_class='admin-table__col--num') %}
+{% set is_active = current_sort == field %}
+{% if is_active and current_dir == 'desc' %}
+    {% set state_class = 'is-desc' %}
+    {% set icon = 'fa-arrow-up' %}
+    {% set next_args = dict(args, sort=field, dir='asc', page=1) %}
+    {% set state_hint = 'maior primeiro — clique para ordenar do menor para o maior' %}
+{% elif is_active and current_dir == 'asc' %}
+    {% set state_class = 'is-asc' %}
+    {% set icon = 'fa-arrow-down' %}
+    {% set next_args = dict(args, sort='', dir='', page=1) %}
+    {% set state_hint = 'menor primeiro — clique para remover a ordenação' %}
+{% else %}
+    {% set state_class = '' %}
+    {% set icon = 'fa-arrow-up' %}
+    {% set next_args = dict(args, sort=field, dir='desc', page=1) %}
+    {% set state_hint = 'sem ordenação — clique para ordenar do maior para o menor' %}
+{% endif %}
+<span class="{{ col_class }} admin-table__col--sortable" role="columnheader"{% if title %} title="{{ title }}"{% endif %}>
+    <a class="admin-table__sort-toggle {{ state_class }}"
+       href="{{ url_for(endpoint, **next_args) }}#lista"
+       aria-label="Ordenar por {{ label }}: {{ state_hint }}">
+        <span class="admin-table__sort-text">{{ label }}</span>
+        <i class="fa-solid {{ icon }}" aria-hidden="true"></i>
+    </a>
+</span>
+{% endmacro %}

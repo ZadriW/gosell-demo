@@ -1,0 +1,13 @@
+{# Logo Go Sell — claro (logo-gosell) e escuro (logo-gosell-white). #}
+{% macro admin_brand_logo(extra_class='') -%}
+<img
+    class="admin-brand-logo admin-brand-logo--light{% if extra_class %} {{ extra_class }}{% endif %}"
+    src="{{ url_for('static', filename='images/logo-gosell.svg') }}"
+    alt="Go Sell"
+>
+<img
+    class="admin-brand-logo admin-brand-logo--dark{% if extra_class %} {{ extra_class }}{% endif %}"
+    src="{{ url_for('static', filename='images/logo-gosell-white.svg') }}"
+    alt="Go Sell"
+>
+{%- endmacro %}

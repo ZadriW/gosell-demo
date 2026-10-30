@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pedido {{ tx.order_number or '#' ~ tx.id }} - Transações | Go Sell</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        body { margin: 0; background: #fff; }
+        @page { size: A4 portrait; margin: 12mm 16mm; }
+        .tx-pdf__kv td:first-child { width: 1%; white-space: nowrap; color: #6b7280; }
+    </style>
+</head>
+<body>
+
+{#
+    Versão para impressão/PDF de um pedido (botão PDF da lista de transações
+    do evento). Mesmo esqueleto dos demais relatórios (.fin-pdf em admin.css).
+#}
+{% set st = (tx.status or '')|lower %}
+{% set st_key = 'entregue' if st == 'confirmado' and (tx.handover_status or '')|lower == 'entregue' else st %}
+{% set st_label = {
+    'entregue': 'Entregue',
+    'confirmado': 'Pago',
+    'pendente': 'Pendente',
+    'cancelado': 'Cancelado',
+    'estornado': 'Estornado',
+}.get(st_key, tx.status or '—') %}
+{% set erp_label = {
+    'enviado': 'Enviado',
+    'na_fila': 'Na fila de envio',
+    'erro': 'Erro no envio',
+    'cancelamento_pendente': 'Cancelamento na fila',
+    'cancelamento_erro': 'Erro no cancelamento',
+    'cancelado': 'Cancelado',
+}.get((tx.erp_status or '')|lower) %}
+{% set tx_items = tx['items'] %}
+{% set show_delivery = st == 'confirmado' and (tx.delivery_status or 'completa') in ('parcial', 'pendente') %}
+{% set ns = namespace(lista=0, units=0) %}
+{% for it in tx_items %}
+{% set ns.lista = ns.lista + (it.original_price or it.unit_price) * it.quantity %}
+{% set ns.units = ns.units + it.quantity %}
+{% endfor %}
+{% set economia = ns.lista - tx.total %}
+{% set parcelas_txt = tx.total | parcelas_cartao(tx.payment_method, tx.card_installments) %}
+{% set created = (tx.created_at | datahora).split(' ') %}
+
+{# Botões de controle — ocultos na impressão #}
+<button class="fin-pdf__print-btn" onclick="window.print()">
+    <i class="fa-solid fa-print" aria-hidden="true"></i>
+    Imprimir / Salvar PDF
+</button>
+
+<a class="fin-pdf__back-btn" href="{{ back_url }}">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    Voltar
+</a>
+
+<div class="fin-pdf">
+
+    {# ── Cabeçalho ─────────────────────────────────────────────────────── #}
+    <header class="fin-pdf__header">
+        <div class="fin-pdf__brand">
+            <img src="{{ url_for('static', filename='images/logo-gosell.svg') }}" alt="Go Sell">
+        </div>
+        <div class="fin-pdf__meta">
+            <div class="fin-pdf__event-name">Pedido {{ tx.order_number or '#' ~ tx.id }}</div>
+            <div class="fin-pdf__period">{{ event.name }}</div>
+            <div class="fin-pdf__generated">
+                Relatório gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }}
+            </div>
+        </div>
+    </header>
+
+    {# ── Resumo ────────────────────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Resumo do pedido</div>
+        <div class="fin-pdf__kpis">
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Total</div>
+                <div class="fin-pdf__kpi-value">{{ tx.total | brl }}</div>
+                <div class="fin-pdf__kpi-hint">
+                    {% if economia > 0.009 %}Economia de {{ economia | brl }}{% else %}Sem descontos{% endif %}
+                </div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Itens</div>
+                <div class="fin-pdf__kpi-value">{{ ns.units }}</div>
+                <div class="fin-pdf__kpi-hint">{{ tx_items|length }} produto{% if tx_items|length != 1 %}s{% endif %}</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Situação</div>
+                <div class="fin-pdf__kpi-value">{{ st_label }}</div>
+                <div class="fin-pdf__kpi-hint">
+                    {% if show_delivery %}Retirada pendente
+                    {% elif st_key == 'entregue' and tx.handover_confirmed_at %}Em {{ tx.handover_confirmed_at | datahora }}
+                    {% else %}&nbsp;{% endif %}
+                </div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Data</div>
+                <div class="fin-pdf__kpi-value">{{ created[0] }}</div>
+                <div class="fin-pdf__kpi-hint">{% if created|length > 1 %}{{ created[1:]|join(' ') }}{% else %}&nbsp;{% endif %}</div>
+            </div>
+        </div>
+    </section>
+
+    {# ── Venda e cliente ──────────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__grid-2">
+            <div>
+                <div class="fin-pdf__section-title">Venda</div>
+                <table class="fin-pdf__table tx-pdf__kv">
+                    <tbody>
+                        <tr>
+                            <td>Vendedor</td>
+                            <td class="num">{{ tx.seller_name or '—' }}</td>
+                        </tr>
+                        <tr>
+                            <td>Forma de pagamento</td>
+                            <td class="num">{{ tx.payment_method | paymethod(tx.card_installments) }}</td>
+                        </tr>
+                        {% if parcelas_txt %}
+                        <tr>
+                            <td>Parcelas</td>
+                            <td class="num">{{ parcelas_txt }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if tx.aut %}
+                        <tr>
+                            <td>AUT</td>
+                            <td class="num">{{ tx.aut }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if erp_label %}
+                        <tr>
+                            <td>ERP</td>
+                            <td class="num">
+                                {{ erp_label }}{% if tx.erp_order_id %} · orçamento nº {{ tx.erp_order_id }}{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if tx.erp_codparc %}
+                        <tr>
+                            <td>Parceiro ERP</td>
+                            <td class="num">{{ tx.erp_codparc }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <div class="fin-pdf__section-title">Cliente</div>
+                {% set addr_parts = [] %}
+                {% if (tx.client_address or '')|trim %}{% if addr_parts.append(tx.client_address|trim) %}{% endif %}{% endif %}
+                {% if (tx.client_number or '')|trim %}{% if addr_parts.append('nº ' ~ tx.client_number|trim) %}{% endif %}{% endif %}
+                {% if (tx.client_complement or '')|trim %}{% if addr_parts.append(tx.client_complement|trim) %}{% endif %}{% endif %}
+                {% if (tx.client_neighborhood or '')|trim %}{% if addr_parts.append(tx.client_neighborhood|trim) %}{% endif %}{% endif %}
+                {% set city = (tx.client_city or '')|trim %}
+                {% set uf = (tx.client_state or '')|trim %}
+                <table class="fin-pdf__table tx-pdf__kv">
+                    <tbody>
+                        <tr>
+                            <td>Nome</td>
+                            <td class="num">{{ (tx.client_name or '')|trim or 'Não informado' }}</td>
+                        </tr>
+                        {% if (tx.client_cpf or '')|trim %}
+                        <tr>
+                            <td>CPF</td>
+                            <td class="num">{{ tx.client_cpf }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if (tx.client_cro_uf or '')|trim or (tx.client_cro_numero or '')|trim %}
+                        <tr>
+                            <td>CRO</td>
+                            <td class="num">{{ tx.client_cro_uf or '' }} {{ tx.client_cro_numero or '' }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if (tx.client_email or '')|trim %}
+                        <tr>
+                            <td>E-mail</td>
+                            <td class="num">{{ tx.client_email }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if (tx.client_phone or '')|trim %}
+                        <tr>
+                            <td>Telefone</td>
+                            <td class="num">{{ tx.client_phone }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if addr_parts %}
+                        <tr>
+                            <td>Endereço</td>
+                            <td class="num">{{ addr_parts | join(', ') }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if city or uf or (tx.client_zipcode or '')|trim %}
+                        <tr>
+                            <td>Cidade / UF</td>
+                            <td class="num">
+                                {{ city }}{% if city and uf %}/{% endif %}{{ uf }}
+                                {% if (tx.client_zipcode or '')|trim %}{% if city or uf %} · {% endif %}CEP {{ tx.client_zipcode }}{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    {# ── Itens ─────────────────────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Itens do pedido ({{ tx_items | length }})</div>
+        {% if tx_items %}
+        <table class="fin-pdf__table">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th style="width:90px">SKU</th>
+                    <th class="num" style="width:44px">Qtd.</th>
+                    {% if show_delivery %}<th class="num" style="width:70px">Pendente</th>{% endif %}
+                    <th class="num" style="width:90px">Unit.</th>
+                    <th class="num" style="width:90px">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for it in tx_items %}
+                <tr>
+                    <td>
+                        <strong>{{ it.product_name }}</strong>
+                        {% if it.category or it.promotion_name %}
+                        <br><small style="color:#9ca3af">
+                            {{ it.category or '' }}{% if it.category and it.promotion_name %} · {% endif %}{{ it.promotion_name or '' }}
+                        </small>
+                        {% endif %}
+                    </td>
+                    <td style="font-size:11px;color:#6b7280">{{ it.product_sku or '—' }}</td>
+                    <td class="num"><strong>{{ it.quantity }}</strong></td>
+                    {% if show_delivery %}
+                    {% set pending = (it.quantity or 0) - (it.quantity_delivered or 0) %}
+                    <td class="num">{% if it.product_id and pending > 0 %}{{ pending }}{% else %}—{% endif %}</td>
+                    {% endif %}
+                    <td class="num">
+                        {% if it.original_price and it.original_price > it.unit_price + 0.001 %}
+                        <small style="color:#9ca3af;text-decoration:line-through">{{ it.original_price | brl }}</small><br>
+                        {% endif %}
+                        {{ it.unit_price | brl }}
+                    </td>
+                    <td class="num"><strong>{{ it.subtotal | brl }}</strong></td>
+                </tr>
+                {% endfor %}
+                {% set cols_before_total = 5 if show_delivery else 4 %}
+                {% if economia > 0.009 %}
+                <tr>
+                    <td colspan="{{ cols_before_total }}">Subtotal (preço de tabela)</td>
+                    <td class="num">{{ ns.lista | brl }}</td>
+                </tr>
+                <tr>
+                    <td colspan="{{ cols_before_total }}">Descontos (promoções)</td>
+                    <td class="num negative">-{{ economia | brl }}</td>
+                </tr>
+                {% endif %}
+                <tr class="total-row">
+                    <td colspan="{{ cols_before_total }}">Total</td>
+                    <td class="num">{{ tx.total | brl }}</td>
+                </tr>
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#9ca3af;font-size:12px">Nenhum item registrado neste pedido.</p>
+        {% endif %}
+    </section>
+
+    {# ── Observação ────────────────────────────────────────────────────── #}
+    {% if (tx.receipt_note or '')|trim %}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Observação na nota</div>
+        <p style="margin:0;font-size:12px;color:#374151;white-space:pre-line">{{ tx.receipt_note|trim }}</p>
+    </section>
+    {% endif %}
+
+    {# ── Rodapé ────────────────────────────────────────────────────────── #}
+    <footer class="fin-pdf__footer">
+        Pedido {{ tx.order_number or '#' ~ tx.id }} — {{ event.name }}
+        — Gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }} pelo sistema Go Sell
+    </footer>
+
+</div>
+
+{# Font Awesome para ícones dos botões (somente no browser) #}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}" media="screen">
+
+</body>
+</html>

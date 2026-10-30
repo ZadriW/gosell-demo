@@ -1,0 +1,174 @@
+/* Usuários — tipo, permissões e eventos (partials/user_access_fields.html)
+   e a lista da seção Usuários (admin/sellers.html). */
+
+.ua {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.ua__block {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.ua__block[hidden] {
+    display: none;
+}
+
+.ua__roles {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ua__perms {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.ua__role,
+.ua__perm,
+.ua__event,
+.ua__all {
+    position: relative;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: border-color 140ms ease, background 140ms ease;
+}
+
+.ua__role input,
+.ua__perm input,
+.ua__event input,
+.ua__all input {
+    flex: 0 0 auto;
+    width: 16px;
+    height: 16px;
+    margin: 2px 0 0;
+    accent-color: var(--color-primary);
+}
+
+.ua__role-text,
+.ua__perm-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ua__role-text strong,
+.ua__perm-text strong {
+    font-size: 13.5px;
+}
+
+.ua__role-text small,
+.ua__perm-text small,
+.ua__event small,
+.ua__all small {
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+    line-height: 1.35;
+}
+
+.ua__role.is-checked,
+.ua__perm.is-checked {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+
+/* Tipo pré-definido: as permissões são do tipo (clicar personaliza) */
+.ua__perm.is-locked {
+    background: var(--color-bg);
+}
+
+.ua__perm.is-locked:not(.is-checked) {
+    opacity: 0.6;
+}
+
+.ua__group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ua__group-title {
+    margin: 4px 0 0;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.ua__events {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.ua__events[hidden] {
+    display: none;
+}
+
+.ua__all {
+    align-self: flex-start;
+    border-style: dashed;
+}
+
+.ua__event {
+    align-items: center;
+    padding: 8px 12px;
+}
+
+/* Lista: tipo e permissões resumidas */
+.users-role {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    background: var(--color-bg);
+    color: var(--color-text-muted);
+}
+
+.users-role--administrador { background: rgba(14, 116, 144, 0.10); color: var(--color-primary); }
+.users-role--vendedor { background: rgba(15, 157, 88, 0.11); color: #0c8a4d; }
+.users-role--marketing { background: rgba(124, 58, 237, 0.10); color: #6d28d9; }
+
+html.admin-theme--dark .users-role--administrador { background: rgba(240, 192, 48, 0.12); color: #f0c030; }
+html.admin-theme--dark .users-role--vendedor { color: #4ade80; }
+html.admin-theme--dark .users-role--marketing { color: #c4b5fd; }
+
+.users-perms {
+    display: block;
+    margin-top: 3px;
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+@media (max-width: 1100px) {
+    .ua__roles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .ua__perms { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+    .ua__roles,
+    .ua__perms { grid-template-columns: minmax(0, 1fr); }
+}

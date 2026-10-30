@@ -1,0 +1,38 @@
+{% extends "seller/_layout.html" %}
+
+{% block title %}Venda - catálogo | Vendedor | Go Sell{% endblock %}
+
+{% block admin_main_class %}admin-main--catalog-embed{% endblock %}
+
+{% block seller_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/catalog.css') }}?v=card-noimg1">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/cart.css') }}">
+{% endblock %}
+
+{% block seller_body %}
+    {% set catalog_brand_href = seller_home_url|default(seller_venda_url, true) %}
+    {% set catalog_brand_aria = 'Catálogo do vendedor' %}
+    {% include 'partials/catalog_content.html' %}
+{% endblock %}
+
+{% block seller_scripts %}
+<script src="{{ url_for('static', filename='js/totem-api-errors.js') }}"></script>
+{% set boot_payload = {
+    '__SELLER_BACKORDER__': true,
+    '__CART_SCOPE__': totem_cart_scope(),
+    '__GIFT_RULES__': cart_gift_rules(),
+    '__TOTEM_FLOW__': totem_flow,
+    '__PRODUCTS__': products,
+    '__CATALOG_STOCK_API__': catalog_stock_api_url,
+    '__CATALOG_PROMO_REFRESH_API__': catalog_promo_refresh_api_url,
+    '__CATALOG_READONLY__': catalog_readonly or false,
+    '__CHECKOUT_HOLD_MODE__': '' if catalog_readonly else 'watch'
+} %}
+{% include 'partials/json_boot.html' %}
+<script src="{{ url_for('static', filename='js/promo-pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/product-search.js') }}?v=busca4"></script>
+<script src="{{ url_for('static', filename='js/catalog.js') }}?v=selo1"></script>
+<script src="{{ url_for('static', filename='js/stock-conflict-modal.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout-hold.js') }}"></script>
+{% endblock %}

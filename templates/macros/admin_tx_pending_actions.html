@@ -1,0 +1,43 @@
+{# Ações para pedidos pendentes (refazer carrinho / descartar). #}
+{% macro admin_tx_pending_actions(tx, writable=True, cancel_endpoint='seller_cancel_pending_transaction', show_restore=True, event_id=none, variant='icon') %}
+{% set st = (tx.status or '')|lower %}
+{% if st == 'pendente' and writable %}
+{% if show_restore %}
+<a
+    href="{{ url_for('seller_restore_pending_checkout', tx_id=tx.id) }}"
+    class="admin-tx__restore-cart"
+    aria-label="Refazer carrinho e retomar o pagamento deste pedido"
+    title="Refazer carrinho"
+>
+    <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+</a>
+{% endif %}
+<form
+    method="post"
+    action="{% if event_id is not none %}{{ url_for(cancel_endpoint, event_id=event_id, tx_id=tx.id) }}{% else %}{{ url_for(cancel_endpoint, tx_id=tx.id) }}{% endif %}"
+    class="admin-tx__discard-form{% if variant == 'button' %} admin-tx__discard-form--action{% endif %}"
+    data-confirm="Descartar este pedido pendente? O carrinho não poderá ser refeito por aqui."
+>
+    {% include 'partials/csrf_field.html' %}
+    {% if variant == 'button' %}
+    <button
+        type="submit"
+        class="admin-btn admin-btn--danger admin-btn--sm"
+        aria-label="Apagar carrinho e descartar pedido pendente"
+    >
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        Apagar carrinho
+    </button>
+    {% else %}
+    <button
+        type="submit"
+        class="admin-tx__discard-cart"
+        aria-label="Apagar carrinho e descartar pedido pendente"
+        title="Apagar carrinho"
+    >
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+    {% endif %}
+</form>
+{% endif %}
+{% endmacro %}

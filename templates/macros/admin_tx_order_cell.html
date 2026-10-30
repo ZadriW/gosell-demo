@@ -1,0 +1,23 @@
+{# Coluna do código do pedido + copiar + nome do cliente (histórico admin-tx). #}
+{% macro admin_tx_order_cell(order_number, client_name=None) -%}
+<span class="admin-table__col admin-tx__order">
+    <span class="admin-tx__order-inner">
+        <span class="admin-tx__order-ref">
+            <strong>#{{ order_number }}</strong>
+            <span
+                class="admin-tx__copy-order"
+                role="button"
+                tabindex="0"
+                data-copy-order="{{ order_number }}"
+                title="Copiar código do pedido"
+                aria-label="Copiar código do pedido {{ order_number }}"
+            >
+                <i class="fa-regular fa-copy" aria-hidden="true"></i>
+            </span>
+        </span>
+        {% if client_name %}
+        <small class="admin-tx__order-client" title="{{ client_name }}">{{ client_name }}</small>
+        {% endif %}
+    </span>
+</span>
+{%- endmacro %}

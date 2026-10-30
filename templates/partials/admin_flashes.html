@@ -1,0 +1,28 @@
+{# Overlay de notificações (canto superior direito). Sempre presente para o JS anexar toasts. #}
+{% set _flash_icons = {
+    'success': 'fa-circle-check',
+    'error': 'fa-circle-xmark',
+    'warning': 'fa-triangle-exclamation',
+    'info': 'fa-circle-info',
+} %}
+{% set _flash_alias = {
+    'danger': 'error',
+    'message': 'info',
+} %}
+<div id="admin-flashes" class="admin-flashes" aria-live="polite" aria-relevant="additions">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, msg in messages %}
+                {% set mapped = _flash_alias.get(category, category) %}
+                {% set cat = mapped if mapped in _flash_icons else 'info' %}
+                <div class="admin-flash admin-flash--{{ cat }}" role="{{ 'alert' if cat == 'error' else 'status' }}">
+                    <i class="fa-solid {{ _flash_icons[cat] }}" aria-hidden="true"></i>
+                    <span>{{ msg }}</span>
+                    <button type="button" class="admin-flash__close" data-flash-close aria-label="Fechar notificação">
+                        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                    </button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>

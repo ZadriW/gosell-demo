@@ -1,0 +1,183 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Transações — {{ event.name }} | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-tx.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+{% set op_noun_l = event|op_noun(lower=True) %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title">Exportar vendas (planilha)</h2>
+            <p class="admin-section__subtitle">
+                Pedidos confirmados com movimentação de venda neste {{ op_noun_l }}.
+                Filtre por vendedor para baixar só as vendas dele, ou deixe em «Todos».
+                Período pela data do pedido é opcional; campos vazios exportam o histórico completo
+                (até os limites do servidor). O arquivo é baixado em .xlsx (Excel).
+            </p>
+        </div>
+    </header>
+    <form class="admin-filters" method="get" action="{{ url_for('admin_event_sales_export_xlsx', event_id=event.id) }}" aria-label="Exportar vendas em planilha Excel">
+        <label class="admin-filter">
+            <span class="admin-filter__label">Vendedor</span>
+            <select name="vendedor" class="admin-filter__input" title="Exportar vendas de um vendedor ou de todos">
+                <option value="0">Todos</option>
+                {% for s in movement_filter_sellers %}
+                <option value="{{ s.id }}">
+                    {{ s.name }}{% if not s.active %} (inativo){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data inicial</span>
+            <input type="date" name="data_inicio" class="admin-filter__input">
+        </label>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data final</span>
+            <input type="date" name="data_fim" class="admin-filter__input">
+        </label>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Detalhe</span>
+            <select name="nivel" class="admin-filter__input" title="Resumo por pedido, uma linha por item, ou planilha completa em duas abas (Pedidos + Itens)">
+                <option value="pedidos">Resumo por pedido</option>
+                <option value="itens">Uma linha por item</option>
+                <option value="completo">Completo (Pedidos + Itens em abas)</option>
+            </select>
+        </label>
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+                Baixar planilha
+            </button>
+        </div>
+    </form>
+</section>
+
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">Histórico de transações</h1>
+            <p class="admin-section__subtitle">
+                Pedidos registrados neste {{ op_noun_l }}.
+                Toque em uma linha para ver itens e totais.
+            </p>
+        </div>
+        {# ── Mobilidade: Movimentações saiu do menu do evento e é acessada por aqui ── #}
+        {% if can('estoque', event.id) %}
+        <div class="admin-section__header-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
+            <a class="admin-btn admin-btn--ghost"
+               href="{{ url_for('admin_event_movements', event_id=event.id) }}"
+               title="Histórico de vendas, entradas e saídas de estoque deste {{ op_noun_l }}">
+                <i class="fa-solid fa-right-left" aria-hidden="true"></i>
+                Movimentações de estoque
+            </a>
+        </div>
+        {% endif %}
+    </header>
+
+    <form class="admin-filters" method="get"
+          action="{{ url_for('admin_event_transactions', event_id=event.id) }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Venda por vendedor</span>
+            <select name="vendedor" class="admin-filter__input">
+                <option value="0" {% if filters.vendedor == 0 %}selected{% endif %}>Todos</option>
+                {% for s in movement_filter_sellers %}
+                <option value="{{ s.id }}" {% if filters.vendedor == s.id %}selected{% endif %}>
+                    {{ s.name }}{% if not s.active %} (inativo){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Status</span>
+            <select name="status" class="admin-filter__input">
+                <option value="todos" {% if filters.status == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="confirmado" {% if filters.status == 'confirmado' %}selected{% endif %}>Pago</option>
+                <option value="pendente" {% if filters.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                <option value="cancelado" {% if filters.status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                <option value="estornado" {% if filters.status == 'estornado' %}selected{% endif %}>Estornado</option>
+                <option value="entregue" {% if filters.status == 'entregue' %}selected{% endif %}>Entregue</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Entrega futura</span>
+            <select name="entrega" class="admin-filter__input"
+                    title="Pedidos com itens aguardando retirada (estoque ainda não baixado)">
+                <option value="todos" {% if filters.entrega == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="parcial" {% if filters.entrega == 'parcial' %}selected{% endif %}>Retirada pendente</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data do pedido</span>
+            <input type="date" name="data" class="admin-filter__input"
+                   value="{{ filters.data }}"
+                   title="Filtrar pelo dia da transação (data de registro no sistema); deixe vazio para todos os dias">
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Por página</span>
+            <select name="per_page" class="admin-filter__input" title="Quantidade de transações por página">
+                {% for n in allowed_per_page %}
+                <option value="{{ n }}" {% if filters.per_page == n %}selected{% endif %}>{{ n }} transações</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="admin-filter admin-filter--wide">
+            <span class="admin-filter__label">Código do pedido</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-receipt admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="pedido"
+                    value="{{ filters.pedido }}"
+                    class="admin-filter__input"
+                    placeholder="Código do pedido, cliente ou parceiro…"
+                    autocomplete="off"
+                    inputmode="search"
+                    aria-describedby="hint-filtro-pedido-event-tx"
+                >
+            </span>
+            <span id="hint-filtro-pedido-event-tx" class="admin-filter__hint">
+                Busca pelo número do pedido (ex.: OM260422-1234), pelo nome do cliente ou pelo código do parceiro no ERP (ex.: 76143).
+            </span>
+        </label>
+
+        <input type="hidden" name="page" value="1" aria-hidden="true">
+        <input type="hidden" name="sort" value="{{ filters.sort }}" aria-hidden="true">
+        <input type="hidden" name="dir" value="{{ filters.dir }}" aria-hidden="true">
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('admin_event_transactions', event_id=event.id) }}" class="admin-btn admin-btn--ghost">Limpar</a>
+        </div>
+    </form>
+
+    <div
+        id="lista"
+        data-admin-event-tx-live
+        data-filter-region="tabela"
+        data-api-url="{{ url_for('admin_api_event_transactions', event_id=event.id) }}"
+        data-poll-ms="20000"
+        aria-live="polite"
+    >
+        {% include 'admin/partials/event_transactions_live.html' %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-tx-live.js') }}"></script>
+{% endblock %}

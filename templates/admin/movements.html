@@ -1,0 +1,277 @@
+{% extends "admin/_layout.html" %}
+{% from "macros/admin_mov_order_ref.html" import admin_mov_order_ref %}
+
+{% block title %}Movimentações — {{ event.name }} | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-movements-table.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+{% set op_noun_l = event|op_noun(lower=True) %}
+{% set qargs = {
+    'q': filters.q,
+    'tipo': filters.tipo,
+    'pedido': filters.pedido,
+    'vendedor': filters.vendedor,
+    'de': filters.de,
+    'ate': filters.ate,
+    'per_page': filters.per_page
+} %}
+<section
+    class="admin-section"
+    data-admin-movements
+    data-api-url="{{ url_for('admin_api_event_movements', event_id=event.id, **qargs) }}"
+    data-filter-attrs="secao"
+>
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">Movimentações de estoque</h1>
+            <p class="admin-section__subtitle" data-filter-region="resumo">
+                Histórico de <strong>vendas</strong>, <strong>entradas</strong> e <strong>saídas</strong>
+                de todos os produtos neste {{ op_noun_l }}, com delta, saldo após a operação,
+                motivo e responsável.
+                {% if pagination.total > 0 %}
+                    Mostrando {{ pagination.showing_from }}–{{ pagination.showing_to }} de {{ pagination.total }}.
+                {% elif filters_active %}
+                    Nenhuma movimentação para os filtros aplicados.
+                {% else %}
+                    Nenhuma movimentação registrada.
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    <form class="admin-filters" method="get"
+          action="{{ url_for('admin_event_movements', event_id=event.id) }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter admin-filter--search">
+            <span class="admin-filter__label">Produto</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-magnifying-glass admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="q"
+                    value="{{ filters.q }}"
+                    class="admin-filter__input"
+                    placeholder="Nome, SKU ou ID"
+                    autocomplete="off"
+                    inputmode="search"
+                >
+            </span>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Tipo</span>
+            <select name="tipo" class="admin-filter__input">
+                <option value="todos" {% if filters.tipo == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="venda" {% if filters.tipo == 'venda' %}selected{% endif %}>Venda</option>
+                <option value="entrada" {% if filters.tipo == 'entrada' %}selected{% endif %}>Entrada</option>
+                <option value="saida" {% if filters.tipo == 'saida' %}selected{% endif %}>Saída</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Venda por vendedor</span>
+            <select name="vendedor" class="admin-filter__input">
+                <option value="0" {% if filters.vendedor == 0 %}selected{% endif %}>Todos</option>
+                {% for s in movement_filter_sellers %}
+                <option value="{{ s.id }}" {% if filters.vendedor == s.id %}selected{% endif %}>
+                    {{ s.name }}{% if not s.active %} (inativo){% endif %}
+                </option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Pedido</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-receipt admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="pedido"
+                    value="{{ filters.pedido }}"
+                    class="admin-filter__input"
+                    placeholder="Ex.: OM260422-1234"
+                    autocomplete="off"
+                >
+            </span>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data inicial</span>
+            <input type="date" name="de" class="admin-filter__input" value="{{ filters.de }}">
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data final</span>
+            <input type="date" name="ate" class="admin-filter__input" value="{{ filters.ate }}">
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Por página</span>
+            <select name="per_page" class="admin-filter__input">
+                {% for n in allowed_per_page %}
+                <option value="{{ n }}" {% if filters.per_page == n %}selected{% endif %}>{{ n }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('admin_event_movements', event_id=event.id) }}" class="admin-btn admin-btn--ghost">Limpar</a>
+            <a
+                data-filter-attrs="exportar-xlsx"
+                href="{{ url_for('admin_event_movements_export_xlsx', event_id=event.id, **qargs) }}"
+                class="admin-btn admin-btn--ghost"
+                title="Exporta as movimentações filtradas como planilha .xlsx"
+            >
+                <i class="fa-solid fa-file-excel" aria-hidden="true"></i>
+                Exportar Planilha
+            </a>
+            <a
+                data-filter-attrs="exportar-pdf"
+                href="{{ url_for('admin_event_movements_pdf', event_id=event.id, **qargs) }}"
+                class="admin-btn admin-btn--ghost"
+                target="_blank"
+                rel="noopener"
+                title="Gera um relatório para impressão/PDF com as movimentações filtradas"
+            >
+                <i class="fa-solid fa-print" aria-hidden="true"></i>
+                Imprimir / Gerar PDF
+            </a>
+        </div>
+    </form>
+
+    {# Estilos em static/css/admin-movements-table.css (mesmo padrão do histórico do
+       produto). Linhas no mesmo markup que o admin-stock-live.js insere ao vivo. #}
+    <div
+        id="lista"
+        class="admin-table admin-movv admin-movv--products"
+        role="table"
+        aria-label="Movimentações de estoque deste {{ op_noun_l }}"
+        data-product-movements
+        data-movements-wide
+        data-filter-region="tabela"
+        data-movements-cap="{{ pagination.per_page }}"
+        {% if movements_live %}data-movements-live{% endif %}
+    >
+        <div class="admin-table__head admin-mov__row admin-mov__row--wide" role="row">
+            <span role="columnheader">Data/Hora</span>
+            <span role="columnheader">Produto</span>
+            <span role="columnheader">Tipo</span>
+            <span role="columnheader" class="admin-table__col--num">Delta</span>
+            <span role="columnheader" class="admin-table__col--num">Saldo</span>
+            <span role="columnheader">Motivo / Ref.</span>
+            <span role="columnheader">Usuário</span>
+        </div>
+
+        {% if movements %}
+            {% for m in movements %}
+            <div class="admin-mov__wrapper" data-movement-id="{{ m.id }}">
+                <div class="admin-mov__row admin-mov__row--wide" role="row">
+                    <span>{{ m.created_at | datahora }}</span>
+                    <span class="admin-mov__product">
+                        {% if m.product_id %}
+                        <a href="{{ url_for('admin_event_stock_product', event_id=event.id, product_id=m.product_id) }}">
+                            {{ m.product_name or ('Produto #' ~ m.product_id) }}
+                        </a>
+                        {% else %}
+                        <span>{{ m.product_name or 'Produto' }}</span>
+                        {% endif %}
+                        {% if m.product_variant or m.product_sku %}
+                        <small>
+                            {% if m.product_variant %}{{ m.product_variant }}{% endif %}
+                            {% if m.product_sku %}
+                            <code class="admin-mov__sku">SKU {{ m.product_sku }}</code>
+                            {% endif %}
+                        </small>
+                        {% endif %}
+                    </span>
+                    <span class="admin-mov__type-cell">
+                        <span class="admin-badge admin-mov__badge admin-mov__badge--{{ m.movement_type }}">
+                            {{ m.movement_type | movlabel }}
+                        </span>
+                    </span>
+                    <span class="admin-table__col--num admin-mov__delta admin-mov__delta--{% if m.delta > 0 %}positive{% elif m.delta < 0 %}negative{% else %}neutral{% endif %}">
+                        {{ m.delta | signed }}
+                    </span>
+                    <span class="admin-table__col--num"><strong>{{ m.balance_after }}</strong></span>
+                    <span class="admin-mov__reason">
+                        {% if m.reference and m.transaction_id %}
+                        {% set tx_url = url_for('admin_event_transactions', event_id=event.id, pedido=m.reference) ~ '#tx-' ~ m.transaction_id %}
+                        {% else %}
+                        {% set tx_url = None %}
+                        {% endif %}
+                        {{ admin_mov_order_ref(m.reference, tx_url) }}
+                        {{ m.reason or '-' }}
+                    </span>
+                    <span class="admin-mov__user-cell">
+                        {{ m.created_by | display_created_by or m.seller_name or '-' }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>
+                    {% if filters_active %}
+                        Nenhuma movimentação encontrada para os filtros aplicados.
+                    {% else %}
+                        Nenhuma movimentação registrada neste {{ op_noun_l }}.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="admin-filter-region" data-filter-region="paginacao">
+    {% if pagination.total > 0 %}
+    <nav class="admin-pagination" aria-label="Paginação das movimentações">
+        <p class="admin-pagination__summary">
+            Mostrando
+            <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+            de <strong>{{ pagination.total }}</strong> movimentação(ões)
+            · página {{ pagination.page }} de {{ pagination.total_pages }}
+        </p>
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_event_movements', event_id=event.id, page=pagination.page - 1, **qargs) }}#lista"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_event_movements', event_id=event.id, page=pagination.page + 1, **qargs) }}#lista"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-stock-live.js') }}?v=confirm1"></script>
+{% endblock %}

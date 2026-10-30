@@ -1,0 +1,21 @@
+{# Legenda dos ícones no histórico de transações (retirada pendente de itens). #}
+<div class="admin-stock-legend" role="note" aria-label="Legenda dos ícones do histórico de transações">
+    <ul class="admin-stock-legend__list">
+        <li class="admin-stock-legend__item">
+            <span class="admin-stock-legend__sample admin-stock-legend__sample--tx-delivery">
+                <span class="admin-badge admin-badge--warn admin-tx__delivery-badge" aria-hidden="true">
+                    <i class="fa-solid fa-box-open" aria-hidden="true"></i>
+                </span>
+            </span>
+            <span class="admin-stock-legend__text">— Pedidos com entrega de itens pendente</span>
+        </li>
+        <li class="admin-stock-legend__item">
+            <span class="admin-stock-legend__sample">
+                <span class="admin-tx__discard-cart" aria-hidden="true" style="pointer-events: none;">
+                    <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                </span>
+            </span>
+            <span class="admin-stock-legend__text">— Descartar pedido pendente (apagar carrinho)</span>
+        </li>
+    </ul>
+</div>

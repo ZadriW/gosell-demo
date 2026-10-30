@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block title %}Restaurar pedido | Go Sell{% endblock %}
+
+{% block head %}
+{% include 'partials/totem_theme_head.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/seller-restore.css') }}">
+{% endblock %}
+
+{% block body %}
+<p class="seller-restore-msg">Restaurando carrinho e redirecionando para o pagamento…</p>
+<script type="application/json" id="totem-page-boot">{{ {
+    '__SELLER_RESTORE_CHECKOUT__': restore_payload,
+    '__SELLER_RESTORE_PAYMENT_URL__': payment_url,
+    '__SELLER_RESTORE_FALLBACK_URL__': url_for('seller_sale')
+} | tojson }}</script>
+<script src="{{ url_for('static', filename='js/totem-page-boot.js') }}"></script>
+<script src="{{ url_for('static', filename='js/seller-restore-checkout.js') }}"></script>
+{% endblock %}

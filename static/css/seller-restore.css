@@ -1,0 +1,9 @@
+/* Página intermediária restore_checkout (flash de texto) */
+.seller-restore-msg {
+    margin: 0;
+    padding: 2.5rem 1.25rem;
+    text-align: center;
+    font-family: inherit;
+    font-size: 15px;
+    color: var(--color-text-muted, #64748b);
+}

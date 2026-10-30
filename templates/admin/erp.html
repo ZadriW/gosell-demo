@@ -1,0 +1,246 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Integração ERP - Admin | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-erp.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+<div data-erp-live-root
+     data-api-url="{{ url_for('admin_erp_live') }}"
+     data-live-active="{{ '1' if live_active else '0' }}">
+<section class="admin-section">
+    <header class="admin-section__header">
+        <h1 class="admin-section__title">
+            Integração ERP (simulada)
+            <span class="erp-live-indicator" data-erp-live-indicator
+                  title="Fila de envio e sincronização do catálogo se atualizam sozinhas">ao vivo</span>
+        </h1>
+        <p class="admin-section__subtitle">
+            O catálogo vem do ERP e as vendas confirmadas vão para lá como orçamento,
+            por uma fila que não trava o pagamento. Estoque do evento, promoções e
+            vendas continuam sendo do Go Sell.
+        </p>
+        <p class="admin-section__subtitle">
+            <i class="fa-solid fa-flask" aria-hidden="true"></i>
+            <strong>Demonstração:</strong> o ERP é simulado dentro do próprio Go Sell, com dados fictícios.
+            No produto, esta tela conversa com o ERP do cliente.
+        </p>
+    </header>
+
+    {# ---------------- Situação ---------------- #}
+    <div data-erp-live-block="status">
+        {% include 'admin/partials/erp_status.html' %}
+    </div>
+</section>
+
+{# ---------------- Configuração ---------------- #}
+<section class="admin-section" id="configuracao">
+    <article class="admin-card">
+        <header class="admin-card__header">
+            <div>
+                <h2 class="admin-card__title">Configuração</h2>
+                <p class="admin-card__subtitle">Login, senha e chave do gateway ficam no arquivo de ambiente do servidor, nunca aqui.</p>
+            </div>
+        </header>
+        <form method="post" action="{{ url_for('admin_erp_settings') }}" class="erp-form">
+            {% include 'partials/csrf_field.html' %}
+            <div class="erp-form__grid">
+                <label class="admin-field">
+                    <span class="admin-field__label">Empresa (CODEMP)</span>
+                    <input class="admin-field__input" name="codemp" inputmode="numeric" value="{{ settings.codemp }}">
+                    <span class="admin-field__hint">Tabela de preço e empresa do pedido.</span>
+                </label>
+                <label class="admin-field">
+                    <span class="admin-field__label">Local de origem (CODLOCALORIG)</span>
+                    <input class="admin-field__input" name="codlocalorig" inputmode="numeric" value="{{ settings.codlocalorig }}" placeholder="ex.: 1030000">
+                    <span class="admin-field__hint">Local de estoque do ERP de onde saem os itens vendidos no Go Sell. O lote (CONTROLE) de cada item é escolhido nesse local.</span>
+                </label>
+                <label class="admin-field">
+                    <span class="admin-field__label">CODVEND de vendedor excluído</span>
+                    <input class="admin-field__input" name="codvend" inputmode="numeric" value="{{ settings.codvend }}" placeholder="opcional">
+                    <span class="admin-field__hint">Cada vendedor tem o seu CODVEND no cadastro dele. Este só vale para vendas de vendedor que foi excluído do Go Sell.</span>
+                </label>
+            </div>
+            <label class="erp-form__check">
+                <input type="checkbox" name="orders_enabled" value="1" {% if settings.orders_enabled == '1' %}checked{% endif %}>
+                Enviar pedidos ao ERP
+            </label>
+            <button type="submit" class="admin-btn admin-btn--primary">Salvar configuração</button>
+        </form>
+    </article>
+</section>
+
+{# ---------------- Vendedores sem CODVEND ---------------- #}
+<section class="admin-section" id="vendedores">
+    <article class="admin-card">
+        <header class="admin-card__header">
+            <div>
+                <h2 class="admin-card__title">Vendedores sem CODVEND ({{ sellers_without_codvend|length }})</h2>
+                <p class="admin-card__subtitle">
+                    Cada venda vai ao ERP com o código de quem vendeu. As vendas de quem está
+                    nesta lista ficam na fila com erro, em vez de sair no nome de outro vendedor.
+                </p>
+            </div>
+        </header>
+        {% if sellers_without_codvend %}
+        <ul class="erp-links">
+            {% for s in sellers_without_codvend %}
+            <li>
+                <span><strong>{{ s.name }}</strong> <small>{{ s.username }} · {{ s.confirmed }} venda(s) confirmada(s)</small></span>
+                <a class="admin-btn admin-btn--ghost admin-btn--sm" href="{{ url_for('admin_seller_detail', seller_id=s.id) }}#seller-access-panel">Cadastrar CODVEND</a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="erp-empty">Todos os vendedores ativos têm CODVEND.</p>
+        {% endif %}
+    </article>
+</section>
+
+{# ---------------- Tipos de negociação ---------------- #}
+{% set tv_catalog = sankhya_payment_types %}
+<section class="admin-section" id="tipos-negociacao">
+    <article class="admin-card">
+        <header class="admin-card__header erp-tv__header">
+            <div>
+                <h2 class="admin-card__title">Tipos de negociação (CODTIPVENDA)</h2>
+                <p class="admin-card__subtitle">
+                    Cada forma de pagamento e parcelamento tem o seu código. Venda numa combinação sem
+                    código fica na fila com erro, em vez de ir ao ERP com o tipo errado.
+                    Débito tem um código só; crédito tem um por parcela. Vendas antigas, registradas só como "Cartão" (antes da separação), usam os códigos do crédito.
+                </p>
+                <p class="erp-tv__source">
+                    {% if tv_catalog %}
+                    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+                    {{ tv_catalog|length }} tipo(s) liberado(s) no ERP, consultados em {{ sankhya_payment_types_synced_at | datahora }}.
+                    Só eles podem ser escolhidos.
+                    {% else %}
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    A lista do ERP ainda não foi consultada: os códigos são digitados à mão e não são conferidos.
+                    {% endif %}
+                </p>
+            </div>
+            <form method="post" action="{{ url_for('admin_erp_payment_types_refresh') }}">
+                {% include 'partials/csrf_field.html' %}
+                <button type="submit" class="admin-btn admin-btn--ghost">
+                    <i class="fa-solid fa-rotate" aria-hidden="true"></i> Atualizar do ERP
+                </button>
+            </form>
+        </header>
+        <form method="post" action="{{ url_for('admin_erp_payment_types') }}" data-erp-tipvenda>
+            {% include 'partials/csrf_field.html' %}
+            <div class="erp-table-wrap">
+                <table class="erp-table">
+                    <thead>
+                        <tr><th>Pagamento no Go Sell</th><th>CODTIPVENDA</th><th>{{ 'Nome no ERP' if tv_catalog else 'Descrição (opcional)' }}</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for row in payment_grid %}
+                        {% set stale = tv_catalog and row.codtipvenda is not none and not row.sankhya %}
+                        <tr{% if stale %} class="is-stale"{% endif %}>
+                            <td>{{ row.label }}</td>
+                            <td>
+                                {% if tv_catalog %}
+                                <select class="admin-field__input erp-tv__select" name="code_{{ row.key }}"
+                                        data-suggested="{{ row.suggested or '' }}" aria-label="CODTIPVENDA de {{ row.label }}">
+                                    <option value="">— sem código —</option>
+                                    {% if stale %}
+                                    <option value="{{ row.codtipvenda }}" selected>{{ row.codtipvenda }} · não liberado no ERP</option>
+                                    {% endif %}
+                                    {% for t in tv_catalog %}
+                                    <option value="{{ t.codtipvenda }}" {% if row.codtipvenda == t.codtipvenda %}selected{% endif %}>{{ t.codtipvenda }} · {{ t.description }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% else %}
+                                <input class="admin-field__input erp-table__code" name="code_{{ row.key }}" inputmode="numeric" value="{{ row.codtipvenda if row.codtipvenda is not none else '' }}">
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if tv_catalog %}
+                                    {% if stale %}
+                                    <span class="erp-tv__warn"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i> O código {{ row.codtipvenda }} não está mais liberado: pedidos com ele param na fila.</span>
+                                    {% elif row.sankhya %}
+                                    <span class="erp-tv__name">{{ row.sankhya.description }}</span>
+                                    {% else %}
+                                    <span class="erp-tv__none">—</span>
+                                    {% endif %}
+                                {% else %}
+                                <input class="admin-field__input" name="desc_{{ row.key }}" value="{{ row.description }}">
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if tv_catalog and unused_payment_types %}
+            <p class="erp-tv__unused">
+                <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                Liberados no ERP e sem uso no Go Sell:
+                {% for t in unused_payment_types %}<span>{{ t.codtipvenda }} · {{ t.description }}</span>{% if not loop.last %}, {% endif %}{% endfor %}.
+            </p>
+            {% endif %}
+            <div class="erp-tv__actions">
+                <button type="submit" class="admin-btn admin-btn--primary">Salvar tipos de negociação</button>
+                {% if tv_catalog %}
+                <button type="button" class="admin-btn admin-btn--ghost" data-erp-tipvenda-suggest
+                        title="Escolhe, nas linhas vazias, o tipo do ERP com o nome correspondente (ex.: POS CARTAO 3X para crédito 3x)">
+                    <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i> Preencher vazios pelos nomes
+                </button>
+                {% endif %}
+            </div>
+        </form>
+    </article>
+</section>
+
+{# ---------------- Fila ---------------- #}
+<section class="admin-section" id="fila" data-erp-live-block="fila">
+    {% include 'admin/partials/erp_queue.html' %}
+</section>
+
+{# ---------------- Histórico ---------------- #}
+<section class="admin-section" id="historico" data-erp-live-block="historico">
+    {% include 'admin/partials/erp_history.html' %}
+</section>
+
+{# ---------------- Catálogo ---------------- #}
+<section class="admin-section" id="catalogo" data-erp-live-block="catalogo">
+    {% include 'admin/partials/erp_catalog.html' %}
+</section>
+
+{# ---------------- Vínculos ---------------- #}
+<section class="admin-section" id="vinculos">
+    <article class="admin-card">
+        <header class="admin-card__header">
+            <div>
+                <h2 class="admin-card__title">Produtos ativos sem CODPROD ({{ link_summary.missing }})</h2>
+                <p class="admin-card__subtitle">Não podem ir num pedido ao ERP até receberem o código.</p>
+            </div>
+        </header>
+        {% if link_summary.products %}
+        <ul class="erp-links">
+            {% for p in link_summary.products %}
+            <li>
+                <span><strong>#{{ p.id }}</strong> {{ p.name }} <small>SKU {{ p.sku }}</small></span>
+                <form method="post" action="{{ url_for('admin_erp_link_product', product_id=p.id) }}" class="erp-links__form">
+                    {% include 'partials/csrf_field.html' %}
+                    <input class="admin-field__input" name="codprod" inputmode="numeric" placeholder="CODPROD" aria-label="CODPROD do produto {{ p.id }}">
+                    <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm">Vincular</button>
+                </form>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="erp-empty">Todos os produtos ativos têm CODPROD.</p>
+        {% endif %}
+    </article>
+</section>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-erp-live.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-erp-tipvenda.js') }}"></script>
+{% endblock %}

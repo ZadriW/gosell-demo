@@ -1,0 +1,5 @@
+{# Badge de nome da promoção ativa (mesmo estilo do catálogo: product-card__promo-name). #}
+<span class="product-card__promo-name" data-product-promo-name
+      {% if not (product.em_promocao and product.promo_nome) %}hidden{% endif %}>
+    {% if product.em_promocao and product.promo_nome %}{{ product.promo_nome }}{% endif %}
+</span>

@@ -1,0 +1,68 @@
+{# Observação impressa no rodapé da nota não fiscal. #}
+{% macro admin_tx_note_form(tx, action_endpoint, writable=True) %}
+{% set note = (tx.receipt_note or '')|trim %}
+{% if note or writable %}
+<div class="admin-tx__note" data-tx-note>
+    {% if note %}
+    {# Numa linha só: o preview preserva quebras (pre-wrap) e a indentação viraria espaço. #}
+    <p class="admin-tx__note-preview"><i class="fa-regular fa-comment-dots" aria-hidden="true"></i>{{ note }}</p>
+    {% endif %}
+    {% if writable %}
+    <div class="admin-tx__note-toolbar">
+        <button
+            type="button"
+            class="admin-btn admin-btn--ghost admin-btn--sm"
+            data-tx-note-toggle
+            aria-expanded="false"
+            aria-controls="tx-note-form-{{ tx.id }}"
+        >
+            <i class="fa-solid fa-pen-to-square" aria-hidden="true"></i>
+            {% if note %}Editar observação da nota{% else %}Adicionar observação à nota{% endif %}
+        </button>
+        {% if note %}
+        <form
+            class="admin-tx__note-delete-form"
+            method="post"
+            action="{{ url_for(action_endpoint, tx_id=tx.id, **kwargs) }}"
+            data-tx-note-delete-form
+            onsubmit="return confirm('Apagar a observação deste pedido na nota?');"
+        >
+            {% include 'partials/csrf_field.html' %}
+            <input type="hidden" name="receipt_note" value="">
+            <button type="submit" class="admin-btn admin-btn--danger admin-btn--sm">
+                <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                Apagar observação
+            </button>
+        </form>
+        {% endif %}
+    </div>
+    <form
+        id="tx-note-form-{{ tx.id }}"
+        class="admin-tx__note-form"
+        method="post"
+        action="{{ url_for(action_endpoint, tx_id=tx.id, **kwargs) }}"
+        hidden
+        data-tx-note-form
+    >
+        {% include 'partials/csrf_field.html' %}
+        <label class="admin-field" for="tx-note-{{ tx.id }}">
+            <span class="admin-field__label">Observação na nota</span>
+            <textarea
+                id="tx-note-{{ tx.id }}"
+                class="admin-field__input admin-tx__note-input"
+                name="receipt_note"
+                rows="3"
+                maxlength="500"
+                placeholder="Texto que aparece no rodapé da nota não fiscal"
+            >{{ note }}</textarea>
+        </label>
+        <p class="admin-tx__note-hint">Até 500 caracteres.</p>
+        <button type="submit" class="admin-btn admin-btn--primary admin-btn--sm">
+            <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+            Salvar observação
+        </button>
+    </form>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}

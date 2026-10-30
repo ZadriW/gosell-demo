@@ -1,0 +1,32 @@
+{#
+    Sub-navegação interna de cada página de evento.
+    Requer: event, active_event_tab
+#}
+<nav class="admin-event-subnav" aria-label="Seções do {{ event|op_noun(lower=True) }}">
+    {% if event %}
+    {% set admin_ev_badge = event.badge_color | event_badge_style %}
+    <span class="admin-nav__event-badge admin-event-subnav__event-badge" title="{% if not event.active %}{{ event|op_noun }} arquivado{% elif event.operations_closed %}Operações encerradas{% else %}{{ event|op_noun }} ativo{% endif %} — {{ event.name }}"{% if admin_ev_badge %} style="{{ admin_ev_badge }}"{% endif %}>
+        {{ event.name }}
+    </span>
+    {% endif %}
+    <a class="admin-event-subnav__item {% if active_event_tab == 'dashboard' %}is-active{% endif %}"
+       href="{{ url_for('admin_event_detail', event_id=event.id) }}">
+        <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+        <span>Dashboard</span>
+    </a>
+    <a class="admin-event-subnav__item {% if active_event_tab == 'estoque' %}is-active{% endif %}"
+       href="{{ url_for('admin_event_stock', event_id=event.id) }}">
+        <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>
+        <span>Estoque</span>
+    </a>
+    <a class="admin-event-subnav__item {% if active_event_tab in ('transacoes', 'movimentacoes') %}is-active{% endif %}"
+       href="{{ url_for('admin_event_transactions', event_id=event.id) }}">
+        <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+        <span>Transações</span>
+    </a>
+    <a class="admin-event-subnav__item {% if active_event_tab == 'promocoes' %}is-active{% endif %}"
+       href="{{ url_for('admin_event_promotions', event_id=event.id) }}">
+        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+        <span>Promoções</span>
+    </a>
+</nav>

@@ -1,0 +1,36 @@
+{# Badge de status da transação (pago, pendente, cancelado, estornado, entregue). #}
+{% macro admin_tx_status_badge(tx) -%}
+{% set st = (tx.status or '')|lower %}
+{% set handover = (tx.handover_status or '')|lower == 'entregue' %}
+{% if st == 'confirmado' and handover %}
+<span class="admin-badge admin-badge--info">Entregue</span>
+{% elif st == 'confirmado' %}
+<span class="admin-badge admin-badge--success">Pago</span>
+{% elif st == 'pendente' %}
+<span class="admin-badge admin-badge--warn">Pendente</span>
+{% elif st == 'cancelado' %}
+<span class="admin-badge admin-badge--danger">Cancelado</span>
+{% elif st == 'estornado' %}
+<span class="admin-badge admin-badge--neutral">Estornado</span>
+{% else %}
+<span class="admin-badge admin-badge--neutral">{{ tx.status }}</span>
+{% endif %}
+{%- endmacro %}
+
+{# Situação do pedido no ERP; vendas nunca enviadas não mostram nada. #}
+{% macro admin_tx_erp_badge(tx) -%}
+{% set es = (tx.erp_status or 'nao_enviado')|lower %}
+{% if es == 'enviado' %}
+<span class="admin-badge admin-badge--success" title="Pedido no ERP{% if tx.erp_order_id %}: {{ tx.erp_order_id }}{% endif %}">ERP ✓</span>
+{% elif es == 'na_fila' %}
+<span class="admin-badge admin-badge--info" title="Aguardando envio ao ERP">ERP na fila</span>
+{% elif es == 'erro' %}
+<span class="admin-badge admin-badge--danger" title="Falha no envio ao ERP: veja Integração ERP">ERP erro</span>
+{% elif es == 'cancelamento_pendente' %}
+<span class="admin-badge admin-badge--warn" title="Cancelamento aguardando envio ao ERP">ERP cancelando</span>
+{% elif es == 'cancelamento_erro' %}
+<span class="admin-badge admin-badge--danger" title="Cancelamento não concluído no ERP: veja Integração ERP">ERP erro cancel.</span>
+{% elif es == 'cancelado' %}
+<span class="admin-badge admin-badge--neutral" title="Pedido cancelado no ERP">ERP cancelado</span>
+{% endif %}
+{%- endmacro %}

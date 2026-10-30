@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "macros/admin_brand_logo.html" import admin_brand_logo %}
+
+{# Usuário logado sem nenhuma área liberada ou sem eventos (rota ``panel_no_access``). #}
+
+{% block title %}Sem acesso | Go Sell{% endblock %}
+
+{% block head %}
+{% include 'partials/theme_init.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+{% endblock %}
+
+{% block body %}
+<main class="admin-login">
+    <div class="admin-login__card">
+        <div class="admin-login__brand">
+            {{ admin_brand_logo() }}
+        </div>
+        <h1 class="admin-login__title">Olá{% if user %}, {{ user.name }}{% endif %}</h1>
+        <p class="admin-login__subtitle">
+            Seu usuário ainda não tem nenhuma área liberada{% if user and user.has_panel %} — ou os eventos dele estão arquivados{% endif %}.
+            Peça ao administrador para ajustar as suas permissões em Usuários.
+        </p>
+        <form method="post" action="{{ url_for('logout') }}">
+            {% include 'partials/csrf_field.html' %}
+            <button type="submit" class="admin-login__submit">
+                Sair
+                <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+            </button>
+        </form>
+        <a class="admin-login__back" href="{{ url_for('welcome') }}">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            Voltar ao Go Sell
+        </a>
+    </div>
+</main>
+{% endblock %}

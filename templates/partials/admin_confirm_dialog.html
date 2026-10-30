@@ -1,0 +1,35 @@
+{# Diálogo de confirmação do painel (substitui window.confirm via admin.js). #}
+<dialog
+    class="admin-modal admin-modal--confirm"
+    id="admin-confirm-dialog"
+    aria-labelledby="admin-confirm-title"
+    aria-describedby="admin-confirm-message"
+>
+    <div class="admin-modal__panel">
+        <header class="admin-modal__header">
+            <h2 class="admin-modal__title" id="admin-confirm-title">Confirmar ação</h2>
+            <button
+                type="button"
+                class="admin-modal__close"
+                id="admin-confirm-close"
+                aria-label="Cancelar"
+            >
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="admin-modal__body admin-confirm__body">
+            <div class="admin-confirm__icon" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <p class="admin-confirm__message" id="admin-confirm-message"></p>
+        </div>
+        <footer class="admin-modal__footer admin-confirm__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" id="admin-confirm-cancel">
+                Cancelar
+            </button>
+            <button type="button" class="admin-btn admin-btn--danger-solid" id="admin-confirm-ok">
+                Confirmar
+            </button>
+        </footer>
+    </div>
+</dialog>

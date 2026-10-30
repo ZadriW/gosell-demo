@@ -1,0 +1,425 @@
+{% extends "base.html" %}
+{% from "macros/admin_brand_logo.html" import admin_brand_logo %}
+
+{% block title %}Pagamento | Go Sell{% endblock %}
+
+{% block head %}
+{% include 'partials/totem_theme_head.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/idle-timeout.css') }}">
+{% endblock %}
+
+{% block body %}
+<div class="payment">
+    <header class="payment__topbar">
+        <a class="payment__back" href="{{ payment_catalog_url }}" id="paymentBack">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            Voltar ao catálogo
+        </a>
+        <a class="payment__brand" href="{{ payment_home_url }}" aria-label="Go Sell">
+            {{ admin_brand_logo() }}
+        </a>
+    </header>
+
+    <main class="payment__content" id="paymentContent">
+        <section class="payment__section">
+            <h1 class="payment__section-title">
+                <i class="fa-solid fa-bag-shopping" aria-hidden="true"></i>
+                Resumo do pedido
+            </h1>
+            <div class="payment__items" id="paymentItems"></div>
+
+            <hr class="payment__divider">
+
+            <h2 class="payment__section-title payment__section-title--sub">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                Dados para retirada
+            </h2>
+
+            <form class="payment-form" id="paymentForm" novalidate>
+                <label class="payment-field">
+                    <span class="payment-field__label">Nome completo <span class="payment-field__required">*</span></span>
+                    <input
+                        type="text"
+                        name="name"
+                        class="payment-field__input"
+                        placeholder="Ex.: João Silva"
+                        required
+                        autocomplete="name"
+                    >
+                </label>
+
+                <label class="payment-field">
+                    <span class="payment-field__label">CPF <span class="payment__section-optional">(opcional — preenche o cadastro do cliente)</span></span>
+                    <input
+                        type="text"
+                        name="cpf"
+                        id="paymentCpf"
+                        class="payment-field__input"
+                        placeholder="000.000.000-00"
+                        maxlength="14"
+                        inputmode="numeric"
+                        autocomplete="off"
+                        aria-describedby="paymentCpfLookup"
+                    >
+                </label>
+
+                <p class="payment-cpf-lookup" id="paymentCpfLookup" role="status" aria-live="polite" hidden></p>
+
+                <label class="payment-field">
+                    <span class="payment-field__label">E-mail</span>
+                    <input
+                        type="email"
+                        name="email"
+                        class="payment-field__input"
+                        placeholder="cliente@email.com"
+                        autocomplete="email"
+                        inputmode="email"
+                    >
+                </label>
+
+                <label class="payment-field">
+                    <span class="payment-field__label">Telefone</span>
+                    <input
+                        type="tel"
+                        name="phone"
+                        id="paymentPhone"
+                        class="payment-field__input"
+                        placeholder="(00) 00000-0000"
+                        maxlength="15"
+                        inputmode="tel"
+                        autocomplete="tel"
+                    >
+                </label>
+
+                <hr class="payment__divider payment__divider--form" aria-hidden="true">
+
+                <div class="payment__section-head">
+                    <h2 class="payment__section-title payment__section-title--sub payment__section-title--address">
+                        <i class="fa-solid fa-location-dot" aria-hidden="true"></i>
+                        Endereço do cliente
+                        <span class="payment__section-optional">(opcional)</span>
+                    </h2>
+                    {% if store_address %}
+                    <button type="button" class="payment-store-btn" id="paymentStoreAddress"
+                            data-store-address="{{ store_address|tojson|forceescape }}"
+                            title="Preencher com o endereço da loja: {{ store_address.address }}, {{ store_address.number }} - {{ store_address.city }}/{{ store_address.state }}">
+                        <i class="fa-solid fa-store" aria-hidden="true"></i>
+                        Loja
+                    </button>
+                    {% endif %}
+                </div>
+
+                <label class="payment-field payment-field--half">
+                    <span class="payment-field__label">CEP</span>
+                    <div class="payment-field__wrap">
+                        <input
+                            type="text"
+                            name="zipcode"
+                            id="paymentZipcode"
+                            class="payment-field__input"
+                            placeholder="00000-000"
+                            maxlength="9"
+                            inputmode="numeric"
+                            autocomplete="postal-code"
+                            pattern="\d{5}-?\d{3}"
+                            title="CEP com 8 dígitos"
+                        >
+                        <button type="button" class="payment-field__cep-btn" id="paymentSearchCep"
+                                disabled
+                                title="Informe um CEP com 8 dígitos"
+                                aria-label="Buscar CEP">
+                            <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <span class="payment-field__loading" id="cepLoading" hidden>
+                        <i class="fa-solid fa-spinner fa-spin" aria-hidden="true"></i>
+                        Buscando...
+                    </span>
+                </label>
+
+                <label class="payment-field payment-field--wide">
+                    <span class="payment-field__label">Endereço</span>
+                    <input
+                        type="text"
+                        name="address"
+                        id="paymentAddress"
+                        class="payment-field__input"
+                        placeholder="Rua, avenida..."
+                        autocomplete="street-address"
+                    >
+                </label>
+
+                <label class="payment-field payment-field--quarter">
+                    <span class="payment-field__label">Número</span>
+                    <input
+                        type="text"
+                        name="number"
+                        class="payment-field__input"
+                        placeholder="123 ou S/N"
+                        autocomplete="off"
+                    >
+                </label>
+
+                <label class="payment-field payment-field--three-quarters">
+                    <span class="payment-field__label">Complemento</span>
+                    <input
+                        type="text"
+                        name="complement"
+                        class="payment-field__input"
+                        placeholder="Apto, bloco..."
+                        autocomplete="off"
+                    >
+                </label>
+
+                <label class="payment-field payment-field--half">
+                    <span class="payment-field__label">Bairro</span>
+                    <input
+                        type="text"
+                        name="neighborhood"
+                        id="paymentNeighborhood"
+                        class="payment-field__input"
+                        placeholder="Ex.: Centro"
+                        autocomplete="off"
+                    >
+                </label>
+
+                <label class="payment-field payment-field--half">
+                    <span class="payment-field__label">Cidade</span>
+                    <input
+                        type="text"
+                        name="city"
+                        id="paymentCity"
+                        class="payment-field__input"
+                        placeholder="Ex.: São Paulo"
+                        autocomplete="address-level2"
+                    >
+                </label>
+
+                <label class="payment-field payment-field--half">
+                    <span class="payment-field__label">Estado</span>
+                    <select name="state" id="paymentState" class="payment-field__input" autocomplete="address-level1">
+                        <option value="">Selecione...</option>
+                        <option value="AC">Acre</option>
+                        <option value="AL">Alagoas</option>
+                        <option value="AP">Amapá</option>
+                        <option value="AM">Amazonas</option>
+                        <option value="BA">Bahia</option>
+                        <option value="CE">Ceará</option>
+                        <option value="DF">Distrito Federal</option>
+                        <option value="ES">Espírito Santo</option>
+                        <option value="GO">Goiás</option>
+                        <option value="MA">Maranhão</option>
+                        <option value="MT">Mato Grosso</option>
+                        <option value="MS">Mato Grosso do Sul</option>
+                        <option value="MG">Minas Gerais</option>
+                        <option value="PA">Pará</option>
+                        <option value="PB">Paraíba</option>
+                        <option value="PR">Paraná</option>
+                        <option value="PE">Pernambuco</option>
+                        <option value="PI">Piauí</option>
+                        <option value="RJ">Rio de Janeiro</option>
+                        <option value="RN">Rio Grande do Norte</option>
+                        <option value="RS">Rio Grande do Sul</option>
+                        <option value="RO">Rondônia</option>
+                        <option value="RR">Roraima</option>
+                        <option value="SC">Santa Catarina</option>
+                        <option value="SP">São Paulo</option>
+                        <option value="SE">Sergipe</option>
+                        <option value="TO">Tocantins</option>
+                    </select>
+                </label>
+            </form>
+        </section>
+
+        <div class="payment__sidebar">
+            <section
+                class="payment__section payment__section--method-flow"
+                aria-labelledby="paymentMethodHeading"
+            >
+                <h2
+                    id="paymentMethodHeading"
+                    class="payment__section-title payment__section-title--sub payment__section-title--method"
+                >
+                    <i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>
+                    Forma de pagamento
+                </h2>
+                <p class="payment-method__hint payment-method__hint--sidebar" id="paymentMethodHint">
+                    Escolha a forma de pagamento antes de continuar. PIX e cartão são processados na maquininha; dinheiro e faturado são confirmados na próxima etapa.
+                </p>
+                <fieldset class="payment-method" form="paymentForm">
+                    <legend class="payment-method__legend">Opção <span class="payment-field__required">*</span></legend>
+                    <div class="payment-method__options">
+                        <label class="payment-method__choice">
+                            <input type="radio" name="payment_method" form="paymentForm" value="pix" required>
+                            <span class="payment-method__box">
+                                <i class="fa-brands fa-pix" aria-hidden="true"></i>
+                                <span class="payment-method__label">PIX</span>
+                            </span>
+                        </label>
+                        <label class="payment-method__choice">
+                            <input type="radio" name="payment_method" form="paymentForm" value="credito" checked>
+                            <span class="payment-method__box">
+                                <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                                <span class="payment-method__label">Crédito</span>
+                            </span>
+                        </label>
+                        <label class="payment-method__choice">
+                            <input type="radio" name="payment_method" form="paymentForm" value="debito">
+                            <span class="payment-method__box">
+                                <i class="fa-regular fa-credit-card" aria-hidden="true"></i>
+                                <span class="payment-method__label">Débito</span>
+                            </span>
+                        </label>
+                        <label class="payment-method__choice">
+                            <input type="radio" name="payment_method" form="paymentForm" value="dinheiro">
+                            <span class="payment-method__box">
+                                <i class="fa-solid fa-money-bill-wave" aria-hidden="true"></i>
+                                <span class="payment-method__label">Dinheiro</span>
+                            </span>
+                        </label>
+                        <label class="payment-method__choice">
+                            <input type="radio" name="payment_method" form="paymentForm" value="faturado">
+                            <span class="payment-method__box">
+                                <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+                                <span class="payment-method__label">Faturado</span>
+                            </span>
+                        </label>
+                    </div>
+                </fieldset>
+
+                <div
+                    class="payment-installments"
+                    id="paymentInstallmentsPanel"
+                    aria-hidden="true"
+                >
+                    <div class="payment-installments__inner">
+                        <label class="payment-installments__field" for="paymentInstallments">
+                            <span class="payment-installments__label">Parcelamento no crédito</span>
+                            <select
+                                id="paymentInstallments"
+                                class="payment-installments__select"
+                                form="paymentForm"
+                                name="installments"
+                                disabled
+                                aria-describedby="paymentInstallmentsHint"
+                            ></select>
+                        </label>
+                        <p class="payment-installments__hint" id="paymentInstallmentsHint"></p>
+                    </div>
+                </div>
+            </section>
+
+            <aside class="payment__section payment__aside-summary">
+                <h2 class="payment__section-title">
+                    <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                    Pagamento
+                </h2>
+
+                <div class="payment__summary-rows">
+                    <div class="payment__summary-row">
+                        <span>Itens</span>
+                        <strong id="paymentCount">0</strong>
+                    </div>
+                    <div class="payment__summary-row">
+                        <span>Subtotal</span>
+                        <strong id="paymentSubtotal">R$ 0,00</strong>
+                    </div>
+                    <div class="payment__summary-row payment__summary-row--discount" id="paymentPromoDiscountRow" hidden>
+                        <span>Promoções</span>
+                        <strong id="paymentPromoDiscount">-R$ 0,00</strong>
+                    </div>
+                    <div class="payment__summary-row payment__summary-row--discount" id="paymentDiscountRow">
+                        <label class="payment__summary-label" for="paymentDiscount">Desconto (R$)</label>
+                        <div class="payment__summary-field">
+                            <span class="payment__summary-affix" aria-hidden="true">R$</span>
+                            <input
+                                id="paymentDiscount"
+                                class="payment__summary-input"
+                                type="text"
+                                inputmode="decimal"
+                                autocomplete="off"
+                                spellcheck="false"
+                                aria-label="Desconto em reais"
+                                value="0,00"
+                            >
+                        </div>
+                    </div>
+                    <div class="payment__summary-row payment__summary-row--discount" id="paymentDiscountPctRow">
+                        <label class="payment__summary-label" for="paymentDiscountPct">Desconto (%)</label>
+                        <div class="payment__summary-field">
+                            <input
+                                id="paymentDiscountPct"
+                                class="payment__summary-input"
+                                type="text"
+                                inputmode="decimal"
+                                autocomplete="off"
+                                spellcheck="false"
+                                aria-label="Desconto em porcentagem"
+                                value="0,00"
+                            >
+                            <span class="payment__summary-affix" aria-hidden="true">%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="payment__summary-total">
+                    <label class="payment__summary-total-label" for="paymentTotal">Total</label>
+                    <div class="payment__summary-field payment__summary-field--total">
+                        <span class="payment__summary-affix payment__summary-affix--total" aria-hidden="true">R$</span>
+                        <input
+                            id="paymentTotal"
+                            class="payment__summary-total-value"
+                            type="text"
+                            inputmode="decimal"
+                            autocomplete="off"
+                            spellcheck="false"
+                            aria-label="Valor total da compra"
+                            value="0,00"
+                        >
+                    </div>
+                </div>
+
+                <div class="payment__instructions">
+                    <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+                    <div>
+                        <strong>Próximo passo</strong>
+                        Revise os itens, os dados e a forma de pagamento. Em seguida você será direcionado à tela
+                        <em>Aguardando pagamento</em>, onde confirma o recebimento (maquininha, PIX/cartão, ou dinheiro em espécie).
+                    </div>
+                </div>
+
+                <div class="payment__actions">
+                    <button type="button" class="payment__btn payment__btn--next" id="paymentContinue">
+                        <i class="fa-solid fa-arrow-right" aria-hidden="true"></i>
+                        Continuar para o pagamento
+                    </button>
+                    <button type="button" class="payment__btn payment__btn--secondary" id="paymentCancel">
+                        Cancelar e voltar ao catálogo
+                    </button>
+                </div>
+            </aside>
+        </div>
+    </main>
+</div>
+{% include 'partials/checkout_idle_lock.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/totem-api-errors.js') }}"></script>
+{% set boot_payload = {
+    '__TOTEM_FLOW__': totem_flow or {},
+    '__SELLER_BACKORDER__': seller_backorder or false,
+    '__CART_SCOPE__': totem_cart_scope(),
+    '__GIFT_RULES__': cart_gift_rules(),
+    '__CHECKOUT_HOLD_MODE__': 'publish',
+    '__CLIENT_LOOKUP_URL__': client_lookup_url or ''
+} %}
+{% include 'partials/json_boot.html' %}
+<script src="{{ url_for('static', filename='js/promo-pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment-form.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout-hold.js') }}"></script>
+<script src="{{ url_for('static', filename='js/idle-timeout.js') }}"></script>
+{% endblock %}

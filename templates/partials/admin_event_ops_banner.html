@@ -1,0 +1,10 @@
+{% if event and event.active and event.operations_closed %}
+<div class="admin-ops-banner" role="status">
+    <i class="fa-solid fa-lock" aria-hidden="true"></i>
+    <div>
+        <strong>Operações encerradas.</strong>
+        Estoque, vendas e transações estão disponíveis apenas para consulta.
+        Novas vendas, edições e movimentações ficam bloqueadas até reabrir as operações.
+    </div>
+</div>
+{% endif %}

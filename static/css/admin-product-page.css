@@ -1,0 +1,772 @@
+/* Página do produto — no estoque do evento (admin/event_stock_product.html) e na
+   biblioteca (admin/product_detail.html). Tudo sob .admin-prodv.
+
+   O admin-stock-live.js troca o selo de situação (admin-badge--<tipo>), o número
+   do estoque e o botão ativar/desativar, e insere linhas .admin-mov__* no
+   histórico: as cores saem desses elementos via :has() e o histórico é estilizado
+   só pelas classes que o JavaScript também gera. */
+
+.admin-prodv {
+    --pv-success: #0c8a4d;
+    --pv-success-bg: rgba(15, 157, 88, 0.11);
+    --pv-warn: #a5620a;
+    --pv-warn-bg: rgba(232, 137, 11, 0.13);
+    --pv-danger: #b91c1c;
+    --pv-danger-bg: rgba(220, 38, 38, 0.09);
+    --pv-info: #1d4ed8;
+    --pv-info-bg: rgba(37, 99, 235, 0.10);
+    --pv-promo: #6d28d9;
+    --pv-promo-bg: rgba(124, 58, 237, 0.10);
+    --pv-neutral-bg: var(--color-bg);
+    --pv-card-border: var(--color-border);
+    --pv-row-hover: rgba(14, 116, 144, 0.025);
+}
+
+html.admin-theme--dark .admin-prodv {
+    --pv-success: var(--admin-success);
+    --pv-success-bg: var(--admin-success-bg);
+    --pv-warn: var(--admin-warn);
+    --pv-warn-bg: var(--admin-warn-bg);
+    --pv-danger: var(--admin-danger);
+    --pv-danger-bg: var(--admin-danger-bg);
+    --pv-info: var(--admin-info);
+    --pv-info-bg: var(--admin-info-bg);
+    --pv-promo: #c4b5fd;
+    --pv-promo-bg: rgba(167, 139, 250, 0.14);
+    --pv-neutral-bg: rgba(255, 255, 255, 0.05);
+    --pv-row-hover: rgba(255, 255, 255, 0.025);
+}
+
+/* ==========================================================================
+   Identidade do produto
+   ========================================================================== */
+.admin-prodv__hero {
+    display: grid;
+    grid-template-columns: 128px minmax(0, 1fr) auto;
+    gap: 22px;
+    align-items: center;
+    padding: 20px 22px;
+    border: 1px solid var(--pv-card-border);
+    border-radius: 16px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-prodv__image {
+    position: relative;
+    width: 128px;
+    height: 128px;
+    border-radius: 14px;
+    border: 1px solid var(--pv-card-border);
+    background: #fff;
+    overflow: hidden;
+}
+
+.admin-prodv__image::before {
+    content: "\f03e";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 400;
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 30px;
+    color: #c5cad6;
+}
+
+.admin-prodv .admin-prodv__img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 8px;
+    border: none;
+    border-radius: 0;
+    object-fit: contain;
+    background: #fff;
+    cursor: zoom-in;
+}
+
+.admin-prodv__identity {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.admin-prodv__eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__eyebrow strong {
+    color: var(--color-text);
+}
+
+.admin-prodv__title {
+    margin: 0;
+    font-size: 22px;
+    line-height: 1.25;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.admin-prodv__variant {
+    margin: 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+}
+
+.admin-prodv__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--pv-card-border);
+    background: var(--color-surface);
+    font-size: 12px;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__chip i {
+    font-size: 11px;
+}
+
+.admin-prodv__chip code {
+    color: var(--color-text);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.admin-prodv__chip a {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--color-primary);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.admin-prodv__chip:has(a):hover {
+    border-color: var(--color-primary);
+}
+
+/* Situação, promoção, retirada */
+.admin-prodv__flags {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    align-self: start;
+}
+
+.admin-prodv .admin-prodv__status .admin-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 13px 6px 11px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: none;
+}
+
+/* Ícone pelo tipo: o atualizador ao vivo troca só classe e texto */
+.admin-prodv .admin-prodv__status .admin-badge::before {
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 11px;
+}
+
+.admin-prodv .admin-prodv__status .admin-badge--success::before { content: "\f00c"; }
+.admin-prodv .admin-prodv__status .admin-badge--warn::before { content: "\f071"; }
+.admin-prodv .admin-prodv__status .admin-badge--danger::before { content: "\f05e"; }
+.admin-prodv .admin-prodv__status .admin-badge--neutral::before { content: "\f070"; }
+
+.admin-prodv .admin-prodv__status .admin-badge--success { background: var(--pv-success-bg); color: var(--pv-success); }
+.admin-prodv .admin-prodv__status .admin-badge--warn { background: var(--pv-warn-bg); color: var(--pv-warn); }
+.admin-prodv .admin-prodv__status .admin-badge--danger { background: var(--pv-danger-bg); color: var(--pv-danger); }
+
+.admin-prodv .admin-prodv__flags .product-card__promo-name {
+    position: static;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 260px;
+    margin: 0;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: var(--pv-promo-bg);
+    color: var(--pv-promo);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    box-shadow: none;
+}
+
+.admin-prodv .admin-prodv__flags .product-card__promo-name::before {
+    content: "\f02b";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 10px;
+}
+
+.admin-prodv .admin-prodv__flags .product-card__promo-name[hidden] {
+    display: none;
+}
+
+.admin-prodv__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.admin-prodv__flag--warn {
+    background: var(--pv-warn-bg);
+    color: var(--pv-warn);
+}
+
+.admin-prodv__toggle-inline {
+    margin: 4px 0 0;
+}
+
+/* ==========================================================================
+   Indicadores
+   ========================================================================== */
+.admin-prodv__stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+    margin: 14px 0 0;
+}
+
+.admin-prodv__stat {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 14px 16px;
+    border: 1px solid var(--pv-card-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-prodv__stat dt {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__stat dt i {
+    font-size: 11.5px;
+    color: var(--color-primary);
+    opacity: 0.8;
+}
+
+.admin-prodv__stat dd {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-prodv__stat--stock dd {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__stat--stock dd strong {
+    font-size: 28px;
+    line-height: 1;
+    font-weight: 800;
+    color: var(--color-text);
+    margin-right: 2px;
+}
+
+/* Estoque colorido pela situação (acompanha o selo atualizado ao vivo) */
+.admin-prodv:has(.admin-prodv__status .admin-badge--danger) .admin-prodv__stat--stock {
+    border-color: transparent;
+    background: var(--pv-danger-bg);
+}
+
+.admin-prodv:has(.admin-prodv__status .admin-badge--danger) .admin-prodv__stat--stock dd strong { color: var(--pv-danger); }
+
+.admin-prodv:has(.admin-prodv__status .admin-badge--warn) .admin-prodv__stat--stock {
+    border-color: transparent;
+    background: var(--pv-warn-bg);
+}
+
+.admin-prodv:has(.admin-prodv__status .admin-badge--warn) .admin-prodv__stat--stock dd strong { color: var(--pv-warn); }
+
+/* ==========================================================================
+   Movimentar estoque / Preço e regras
+   ========================================================================== */
+.admin-prodv__grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 20px;
+    margin-top: 22px;
+    align-items: start;
+}
+
+.admin-prodv__col {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
+}
+
+.admin-prodv__heading {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__heading i {
+    color: var(--color-primary);
+    opacity: 0.85;
+}
+
+.admin-prodv__heading--lg {
+    font-size: 17px;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--color-text);
+}
+
+/* Entrada / Saída (cartões recolhíveis) */
+.admin-prodv .admin-prodv__move {
+    padding: 0;
+    border: 1px solid var(--pv-card-border);
+    border-left-width: 1px;
+    border-radius: 14px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+}
+
+.admin-prodv .admin-prodv__move .admin-card__header--toggle {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    margin: 0;
+    padding: 14px 16px;
+    border: none;
+    background: transparent;
+    text-align: left;
+    cursor: pointer;
+}
+
+.admin-prodv .admin-prodv__move .admin-card__header--toggle:hover {
+    background: var(--pv-row-hover);
+}
+
+.admin-prodv__move-icon {
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 38px;
+    height: 38px;
+    border-radius: 11px;
+    font-size: 15px;
+}
+
+.admin-prodv__move-icon--in { background: var(--pv-success-bg); color: var(--pv-success); }
+.admin-prodv__move-icon--out { background: var(--pv-warn-bg); color: var(--pv-warn); }
+
+.admin-prodv__move-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.admin-prodv .admin-prodv__move .admin-card__title {
+    margin: 0;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.admin-prodv .admin-prodv__move .admin-card__subtitle {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv .admin-prodv__move .admin-card__toggle-chevron {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    color: var(--color-text-muted);
+    transition: transform var(--transition, 160ms), background var(--transition, 160ms);
+}
+
+.admin-prodv .admin-prodv__move.is-expanded .admin-card__toggle-chevron {
+    transform: rotate(180deg);
+    background: var(--pv-neutral-bg);
+}
+
+.admin-prodv .admin-prodv__move .admin-card__collapsible-panel {
+    padding: 0 16px 16px;
+    border-top: 1px solid var(--pv-card-border);
+}
+
+.admin-prodv .admin-prodv__move-form {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 12px;
+    margin: 0;
+    padding-top: 14px;
+}
+
+.admin-prodv .admin-prodv__move-form .admin-field {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+}
+
+.admin-prodv .admin-prodv__move-form > .admin-btn {
+    grid-column: 1 / -1;
+    justify-content: center;
+}
+
+/* Mesmo campo do painel de preço e regras (branco, borda fina, anel de foco) */
+.admin-prodv .admin-prodv__move-form .admin-field__input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--pv-card-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    font-size: 14px;
+}
+
+.admin-prodv .admin-prodv__move-form .admin-field__input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+}
+
+html.admin-theme--dark .admin-prodv .admin-prodv__move-form .admin-field__input:focus {
+    box-shadow: 0 0 0 3px var(--admin-tint-strong, rgba(240, 192, 48, 0.28));
+}
+
+.admin-prodv .admin-prodv__move-form .admin-field__input[type="number"] {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Painel de preço e regras */
+.admin-prodv__panel {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--pv-card-border);
+    border-radius: 14px;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.admin-prodv .admin-prodv__form {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    margin: 0;
+    padding: 14px 16px;
+}
+
+.admin-prodv .admin-prodv__form + .admin-prodv__form {
+    border-top: 1px solid var(--pv-card-border);
+}
+
+.admin-prodv__form-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__input-row {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+}
+
+.admin-prodv__affix {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 40px;
+    border: 1px solid var(--pv-card-border);
+    border-radius: 10px;
+    background: var(--color-surface);
+    transition: border-color var(--transition, 160ms), box-shadow var(--transition, 160ms);
+}
+
+.admin-prodv__affix:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.12);
+}
+
+html.admin-theme--dark .admin-prodv__affix:focus-within {
+    box-shadow: 0 0 0 3px var(--admin-tint-strong, rgba(240, 192, 48, 0.28));
+}
+
+.admin-prodv .admin-prodv__affix .admin-field__input {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0 12px;
+    border: none;
+    border-radius: 10px;
+    background: transparent;
+    box-shadow: none;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-prodv .admin-prodv__affix .admin-field__input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+.admin-prodv__affix-text {
+    padding-left: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__affix-text + .admin-field__input {
+    padding-left: 6px;
+}
+
+.admin-prodv__affix-text--end {
+    padding: 0 12px 0 0;
+    font-weight: 600;
+}
+
+.admin-prodv .admin-prodv__input-row .admin-btn {
+    flex-shrink: 0;
+    height: 40px;
+    margin: 0;
+}
+
+.admin-prodv__hint {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 8px;
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__hint strong {
+    color: var(--color-text);
+}
+
+/* (0,3,0): vence .admin-product__price-restore do admin.css (botão de largura total) */
+.admin-prodv .admin-prodv__hint .admin-prodv__link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: auto;
+    height: auto;
+    margin: 0 0 0 4px;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background: none;
+    box-shadow: none;
+    color: var(--color-primary);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.admin-prodv .admin-prodv__link-btn:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* Disponível no Go Sell */
+.admin-prodv .admin-prodv__toggle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px 14px;
+    margin: 0;
+    padding: 12px 16px;
+    border: 1px dashed var(--pv-card-border);
+    border-radius: 14px;
+}
+
+.admin-prodv__toggle-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12.5px;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv__toggle-text strong {
+    font-size: 13.5px;
+    color: var(--color-text);
+}
+
+/* Aviso */
+.admin-prodv__notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 16px 0 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: var(--pv-info-bg);
+    color: var(--color-text);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.admin-prodv__notice > i {
+    margin-top: 2px;
+    color: var(--pv-info);
+}
+
+/* ==========================================================================
+   Histórico de movimentações
+   ========================================================================== */
+.admin-prodv--history {
+    margin-top: 28px;
+}
+
+.admin-prodv__section-head {
+    margin-bottom: 12px;
+}
+
+.admin-prodv__section-sub {
+    margin: 4px 0 0;
+    font-size: 13px;
+    color: var(--color-text-muted);
+}
+
+.admin-prodv--history > .admin-filters {
+    margin-bottom: 14px;
+}
+
+/* A tabela (.admin-movv) fica em admin-movements-table.css, compartilhada
+   com a página de Movimentações do evento. */
+
+/* ==========================================================================
+   Telas médias
+   ========================================================================== */
+@media (max-width: 1100px) {
+    .admin-prodv__grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* ==========================================================================
+   Celular
+   ========================================================================== */
+@media (max-width: 760px) {
+    .admin-prodv__hero {
+        grid-template-columns: 84px minmax(0, 1fr);
+        grid-template-areas:
+            "image identity"
+            "flags flags";
+        gap: 14px;
+        padding: 16px;
+    }
+
+    .admin-prodv__image {
+        grid-area: image;
+        width: 84px;
+        height: 84px;
+        align-self: start;
+    }
+
+    .admin-prodv__identity { grid-area: identity; }
+
+    .admin-prodv__flags {
+        grid-area: flags;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .admin-prodv__title {
+        font-size: 17px;
+    }
+
+    .admin-prodv__stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+    }
+
+    .admin-prodv__stat {
+        padding: 12px;
+    }
+
+    .admin-prodv__stat dd {
+        font-size: 16px;
+    }
+
+    .admin-prodv .admin-prodv__move-form {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .admin-prodv .admin-prodv__hint {
+        font-size: 11.5px;
+    }
+}

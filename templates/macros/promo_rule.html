@@ -1,0 +1,73 @@
+{#
+    Promoções — textos e ícones de cada tipo de regra (lista e formulário).
+    A versão ao vivo do formulário está em static/js/admin-promo-form.js (ruleSentence).
+#}
+
+{% set PROMO_RULE_META = {
+    'exact_bundle': {'icon': 'fa-box', 'title': 'Kit fechado', 'hint': 'Ex.: kit de 5 por R$ 349,50'},
+    'min_bundle': {'icon': 'fa-layer-group', 'title': 'A partir de N un.', 'hint': 'Ex.: a partir de 3, cada unidade por R$ 89,90'},
+    'combo_bundle': {'icon': 'fa-object-group', 'title': 'Combo de produtos', 'hint': 'Ex.: 1 de cada por R$ 99,90'},
+    'bogo': {'icon': 'fa-gift', 'title': 'Compre e leve', 'hint': 'Ex.: compre 2, leve 3'},
+    'percent': {'icon': 'fa-percent', 'title': 'Desconto em %', 'hint': 'Ex.: 10% em cada unidade'},
+    'fixed': {'icon': 'fa-tag', 'title': 'Desconto em R$', 'hint': 'Ex.: R$ 5 a menos por unidade'},
+} %}
+
+{% macro promo_rule_icon(rule_type) -%}
+{{ (PROMO_RULE_META.get(rule_type) or {}).get('icon', 'fa-tag') }}
+{%- endmacro %}
+
+{% macro promo_rule_text(promo) -%}
+{%- set rt = promo.rule_type -%}
+{%- set v = promo.rule_value or 0 -%}
+{%- if rt == 'percent' -%}
+    {{ (v | int) if v == (v | int) else ('%.1f'|format(v))|replace('.', ',') }}% de desconto por unidade
+{%- elif rt == 'fixed' -%}
+    {{ v | brl }} de desconto por unidade
+{%- elif rt == 'bogo' -%}
+    {%- if promo.bogo_buy_sku and promo.bogo_free_sku and promo.bogo_buy_sku != promo.bogo_free_sku -%}
+    Compre {{ promo.min_qty }} do {{ promo.bogo_buy_sku }}, leve {{ promo.free_qty }} do {{ promo.bogo_free_sku }} grátis
+    {%- else -%}
+    Compre {{ promo.min_qty }}, leve {{ promo.min_qty + promo.free_qty }}
+    {%- endif -%}
+{%- elif rt == 'min_bundle' -%}
+    A partir de {{ promo.min_qty }} un.: {{ v | brl }} cada
+{%- elif rt == 'exact_bundle' -%}
+    Kit de {{ promo.min_qty }} un. por {{ v | brl }}
+{%- elif rt == 'combo_bundle' -%}
+    Combo: 1 de cada por {{ v | brl }}
+{%- else -%}
+    {{ promo.rule_label or rt }}
+{%- endif -%}
+{%- endmacro %}
+
+{#
+    Brindes — mesma ideia para as regras de brinde (database/gifts.py).
+    A versão ao vivo do formulário está em static/js/admin-gift-form.js (ruleSentence).
+#}
+
+{% set GIFT_RULE_META = {
+    'min_qty': {'icon': 'fa-cart-plus', 'title': 'A partir de N unidades', 'hint': 'Ex.: a partir de 3 un., ganhe o brinde'},
+    'kit': {'icon': 'fa-boxes-stacked', 'title': 'A cada kit do mesmo produto', 'hint': 'Ex.: a cada 5 un. de um item, ganhe o brinde'},
+    'min_total': {'icon': 'fa-sack-dollar', 'title': 'Valor do pedido', 'hint': 'Ex.: pedidos a partir de R$ 1.000, ganhe o brinde'},
+} %}
+
+{% macro gift_rule_icon(rule_type) -%}
+{{ (GIFT_RULE_META.get(rule_type) or {}).get('icon', 'fa-gift') }}
+{%- endmacro %}
+
+{% macro gift_rule_text(rule) -%}
+{#- Produto e avulso podem vir juntos: "1 un. de X + 1 un. de Caneca". -#}
+{%- set ns = namespace(parts=[]) -%}
+{%- for g in (rule.gifts or []) -%}
+{%- set ns.parts = ns.parts + [rule.gift_qty ~ ' un. de ' ~ g.name] -%}
+{%- endfor -%}
+{%- set gift = ns.parts | join(' + ') if ns.parts else (rule.gift_qty ~ ' un. de ' ~ (rule.gift_name or 'brinde')) -%}
+{%- if rule.rule_type == 'kit' -%}
+    A cada kit de {{ rule.min_qty }} un. do mesmo produto, ganhe {{ gift }}
+    {%- if rule.max_per_order %} (até {{ rule.max_per_order }} por pedido){% endif %}
+{%- elif rule.rule_type == 'min_total' -%}
+    {{ 'Compras dos participantes' if rule.products else 'Pedidos' }} a partir de {{ (rule.min_value or 0) | brl }}, ganhe {{ gift }}
+{%- else -%}
+    A partir de {{ rule.min_qty }} un., ganhe {{ gift }}
+{%- endif -%}
+{%- endmacro %}

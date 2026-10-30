@@ -1,0 +1,53 @@
+{# Cartões de meta de faturamento / volume vs. realizado do evento. #}
+{% macro goal_card(metric, kind, compact=false) %}
+{% set is_revenue = kind == 'revenue' %}
+{% set label = 'Meta de faturamento' if is_revenue else 'Meta de volume' %}
+{% if metric %}
+<article class="admin-goal-card{% if compact %} admin-goal-card--compact{% endif %}{% if metric.reached %} admin-goal-card--reached{% endif %}">
+    <header class="admin-goal-card__head">
+        <span class="admin-goal-card__icon" aria-hidden="true">
+            <i class="fa-solid {% if is_revenue %}fa-bullseye{% else %}fa-boxes-stacked{% endif %}"></i>
+        </span>
+        <span class="admin-goal-card__label">{{ label }}</span>
+        {% if metric.reached %}
+        <span class="admin-badge admin-badge--success">Atingida</span>
+        {% endif %}
+    </header>
+    <p class="admin-goal-card__values">
+        {% if is_revenue %}
+        <strong>{{ metric.actual | brl }}</strong>
+        <span>de {{ metric.goal | brl }}</span>
+        {% else %}
+        <strong>{{ metric.actual | int }} un.</strong>
+        <span>de {{ metric.goal | int }} un.</span>
+        {% endif %}
+    </p>
+    <div class="admin-goal-card__bar" role="progressbar"
+         aria-valuemin="0" aria-valuemax="100"
+         aria-valuenow="{{ metric.bar_percent | round(0, 'floor') | int }}"
+         aria-label="{{ label }}: {{ metric.percent }}%">
+        <span class="admin-goal-card__bar-fill" style="width: {{ metric.bar_percent }}%"></span>
+    </div>
+    <p class="admin-goal-card__meta">
+        <span>{{ metric.percent }}%</span>
+        {% if metric.reached %}
+        <span>Meta superada ou igualada</span>
+        {% elif is_revenue %}
+        <span>Faltam {{ metric.remaining | brl }}</span>
+        {% else %}
+        <span>Faltam {{ metric.remaining | int }} un.</span>
+        {% endif %}
+    </p>
+</article>
+{% else %}
+<article class="admin-goal-card admin-goal-card--empty{% if compact %} admin-goal-card--compact{% endif %}">
+    <header class="admin-goal-card__head">
+        <span class="admin-goal-card__icon" aria-hidden="true">
+            <i class="fa-solid {% if is_revenue %}fa-bullseye{% else %}fa-boxes-stacked{% endif %}"></i>
+        </span>
+        <span class="admin-goal-card__label">{{ label }}</span>
+    </header>
+    <p class="admin-goal-card__empty-text">Nenhuma meta definida</p>
+</article>
+{% endif %}
+{% endmacro %}

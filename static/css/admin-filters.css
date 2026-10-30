@@ -1,0 +1,263 @@
+/* Barra de filtros (form.admin-filters) — admin e painel do vendedor.
+   Carregado depois do admin.css (admin/_layout.html e partials/totem_theme_head.html).
+   Só CSS: o markup e o admin-filters.js (filtro sem recarregar) não mudam.
+
+   "Filtro em uso": campo de texto preenchido, select fora da 1ª opção (sempre
+   "Todos/Todas"; "Por página", ordenação e nível de detalhe não contam) ou data preenchida. Ele ganha destaque
+   e entra na contagem "Filtros em uso: N" ao lado dos botões. */
+
+.admin-filters {
+    --flt-border: var(--color-border);
+    --flt-border-hover: #c3c8d6;
+    --flt-field-bg: var(--color-surface);
+    --flt-active: var(--color-primary);
+    --flt-active-bg: rgba(14, 116, 144, 0.045);
+    --flt-active-border: rgba(14, 116, 144, 0.45);
+    --flt-ring: rgba(14, 116, 144, 0.12);
+    --flt-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%236b7280' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+    counter-reset: flt-active;
+    gap: 14px 14px;
+    padding: 16px 18px 14px;
+    border: 1px solid var(--color-border);
+    box-shadow: var(--shadow-sm);
+}
+
+html.admin-theme--dark .admin-filters {
+    --flt-border-hover: rgba(255, 255, 255, 0.18);
+    --flt-field-bg: rgba(255, 255, 255, 0.03);
+    --flt-active-bg: rgba(240, 192, 48, 0.07);
+    --flt-active-border: rgba(240, 192, 48, 0.55);
+    --flt-ring: var(--admin-tint-strong, rgba(240, 192, 48, 0.28));
+    --flt-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%238b93b8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* ---------- Rótulo ---------- */
+.admin-filters .admin-filter {
+    gap: 6px;
+    min-width: 0;
+}
+
+.admin-filters .admin-filter__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10.5px;
+    letter-spacing: 0.08em;
+}
+
+/* ---------- Campos ---------- */
+.admin-filters .admin-filter__input {
+    height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--flt-border);
+    border-radius: 10px;
+    background-color: var(--flt-field-bg);
+    font-size: 13.5px;
+    color: var(--color-text);
+    transition: border-color var(--transition, 160ms), background-color var(--transition, 160ms),
+                box-shadow var(--transition, 160ms);
+}
+
+.admin-filters .admin-filter__wrap .admin-filter__input {
+    padding-left: 36px;
+}
+
+.admin-filters .admin-filter__input[type="search"],
+.admin-filters .admin-filter__input[type="text"] {
+    cursor: text;
+}
+
+.admin-filters .admin-filter__input::placeholder {
+    color: var(--color-text-muted);
+    opacity: 0.75;
+}
+
+.admin-filters .admin-filter__input:hover {
+    border-color: var(--flt-border-hover);
+}
+
+.admin-filters .admin-filter__input:focus,
+.admin-filters .admin-filter__input:focus-visible {
+    outline: none;
+    border-color: var(--color-primary);
+    background-color: var(--flt-field-bg);
+    box-shadow: 0 0 0 3px var(--flt-ring);
+}
+
+/* Seta própria no select (a nativa muda a cada navegador) */
+.admin-filters select.admin-filter__input {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-right: 34px;
+    background-image: var(--flt-chevron);
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 12px;
+    text-overflow: ellipsis;
+}
+
+.admin-filters .admin-filter__icon {
+    left: 13px;
+    font-size: 12.5px;
+    transition: color var(--transition, 160ms);
+}
+
+.admin-filters .admin-filter__wrap:focus-within .admin-filter__icon {
+    color: var(--color-primary);
+}
+
+.admin-filters .admin-filter__input[type="date"] {
+    cursor: pointer;
+}
+
+.admin-filters .admin-filter__input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.55;
+    cursor: pointer;
+}
+
+.admin-filters .admin-filter__input[type="date"]:hover::-webkit-calendar-picker-indicator {
+    opacity: 0.9;
+}
+
+.admin-filters .admin-filter__hint {
+    margin-top: 0;
+    font-size: 11.5px;
+}
+
+/* Busca ocupa duas colunas sem deixar buraco ao lado */
+.admin-filters .admin-filter--search {
+    max-width: none;
+}
+
+/* ---------- Filtro em uso ---------- */
+.admin-filters .admin-filter:has(.admin-filter__input[placeholder]:not([type="date"]):not(:placeholder-shown)),
+.admin-filters .admin-filter:has(select.admin-filter__input:not([name="per_page"]):not([name="sort"]):not([name="nivel"]) option:checked:not(:first-child)),
+.admin-filters .admin-filter:has(.admin-filter__input[type="date"][value]:not([value=""])) {
+    counter-increment: flt-active;
+}
+
+.admin-filters .admin-filter:has(.admin-filter__input[placeholder]:not([type="date"]):not(:placeholder-shown)) .admin-filter__input,
+.admin-filters .admin-filter:has(select.admin-filter__input:not([name="per_page"]):not([name="sort"]):not([name="nivel"]) option:checked:not(:first-child)) .admin-filter__input,
+.admin-filters .admin-filter:has(.admin-filter__input[type="date"][value]:not([value=""])) .admin-filter__input {
+    border-color: var(--flt-active-border);
+    background-color: var(--flt-active-bg);
+}
+
+.admin-filters .admin-filter:has(.admin-filter__input[placeholder]:not([type="date"]):not(:placeholder-shown)) .admin-filter__label,
+.admin-filters .admin-filter:has(select.admin-filter__input:not([name="per_page"]):not([name="sort"]):not([name="nivel"]) option:checked:not(:first-child)) .admin-filter__label,
+.admin-filters .admin-filter:has(.admin-filter__input[type="date"][value]:not([value=""])) .admin-filter__label {
+    color: var(--flt-active);
+}
+
+.admin-filters .admin-filter:has(.admin-filter__input[placeholder]:not([type="date"]):not(:placeholder-shown)) .admin-filter__label::after,
+.admin-filters .admin-filter:has(select.admin-filter__input:not([name="per_page"]):not([name="sort"]):not([name="nivel"]) option:checked:not(:first-child)) .admin-filter__label::after,
+.admin-filters .admin-filter:has(.admin-filter__input[type="date"][value]:not([value=""])) .admin-filter__label::after {
+    content: "";
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+/* ---------- Ações ---------- */
+.admin-filters > .admin-filters__actions {
+    gap: 8px;
+    margin-top: 2px;
+    padding-top: 14px;
+    border-top: 1px solid var(--color-border);
+}
+
+/* "Limpar": ação secundária, sem peso de botão */
+.admin-filters__actions > .admin-btn--primary:first-child + .admin-btn--ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--color-text-muted);
+    box-shadow: none;
+}
+
+.admin-filters__actions > .admin-btn--primary:first-child + .admin-btn--ghost:hover {
+    color: var(--color-text);
+    background: var(--color-bg);
+}
+
+/* Exportar, imprimir...: agrupados à direita */
+.admin-filters__actions > .admin-btn--primary:first-child + .admin-btn--ghost ~ * {
+    order: 2;
+}
+
+.admin-filters__actions > .admin-btn--primary:first-child + .admin-btn--ghost + * {
+    margin-left: auto;
+}
+
+/* "Filtros em uso: N" logo depois de Aplicar/Limpar */
+.admin-filters__actions::after {
+    order: 1;
+    content: "Filtros em uso: " counter(flt-active);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--flt-active-bg);
+    color: var(--flt-active);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Nenhum em uso: some. (:has() não pode ser aninhado, por isso três :not(:has()).) */
+.admin-filters:not(:has(.admin-filter__input[placeholder]:not([type="date"]):not(:placeholder-shown))):not(:has(select.admin-filter__input:not([name="per_page"]):not([name="sort"]):not([name="nivel"]) option:checked:not(:first-child))):not(:has(.admin-filter__input[type="date"][value]:not([value=""]))) .admin-filters__actions::after {
+    display: none;
+}
+
+/* Carregando (filtro sem recarregar): ícone do Aplicar gira */
+.admin-filters.is-filter-loading .admin-filters__actions > .admin-btn--primary:first-child i {
+    animation: fa-spin 0.9s linear infinite;
+}
+
+.admin-filters.is-filter-loading .admin-filters__actions > .admin-btn--primary:first-child i::before {
+    content: "\f110";
+}
+
+/* ---------- Celular: duas colunas, busca primeiro ---------- */
+@media (max-width: 640px) {
+    .admin-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px 10px;
+        padding: 14px;
+    }
+
+    .admin-filters .admin-filter--search,
+    .admin-filters .admin-filter--wide,
+    .admin-filters .admin-filter:has(.admin-filter__wrap) {
+        grid-column: 1 / -1;
+        order: -1;
+    }
+
+    .admin-filters .admin-filter__label {
+        font-size: 10px;
+    }
+
+    .admin-filters .admin-filter__input {
+        font-size: 13px;
+    }
+
+    /* Vence a regra do admin.css que limitava a data a 9,75rem */
+    .admin-shell .admin-filters .admin-filter .admin-filter__input[type="date"] {
+        width: 100%;
+        font-size: 13px;
+    }
+
+    .admin-filters > .admin-filters__actions {
+        order: 10;
+    }
+
+    .admin-filters__actions > .admin-btn--primary:first-child {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .admin-filters__actions > .admin-btn--primary:first-child + .admin-btn--ghost + * {
+        margin-left: 0;
+    }
+}

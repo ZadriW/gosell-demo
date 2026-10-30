@@ -1,0 +1,120 @@
+{% macro admin_tx_item_cells(it, event_id=None, seller_id=None, editable=False, tx=None, link=True) %}
+<span class="admin-tx__product">
+    {% if not link %}
+    {{ it.product_name }}
+    {% elif it.product_id and seller_id %}
+    <a class="admin-tx__product-link"
+       href="{{ url_for('seller_stock_product', product_id=it.product_id) }}"
+       title="Ver minhas vendas deste produto">
+        {{ it.product_name }}
+    </a>
+    {% elif it.product_id and event_id %}
+    <a class="admin-tx__product-link"
+       href="{{ url_for('admin_event_stock_product', event_id=event_id, product_id=it.product_id) }}"
+       title="Ver produto no estoque do {{ event|op_noun(lower=True) if event is defined else 'evento' }}">
+        {{ it.product_name }}
+    </a>
+    {% elif it.product_id %}
+    <a class="admin-tx__product-link"
+       href="{{ url_for('admin_product_detail', product_id=it.product_id) }}"
+       title="Ver produto no catálogo">
+        {{ it.product_name }}
+    </a>
+    {% else %}
+    {{ it.product_name }}
+    {% endif %}
+    {% if it.promotion_name %}
+    <span class="admin-tx__promo-label">
+        <i class="fa-solid fa-tag" aria-hidden="true"></i>
+        {{ it.promotion_name }}
+    </span>
+    {% endif %}
+</span>
+<span class="admin-tx__sku-cell">
+    <span class="admin-tx__sku-view">{% if it.product_sku %}<code>{{ it.product_sku }}</code>{% else %}—{% endif %}</span>
+    {% if editable %}
+    <input
+        class="admin-tx__sku-input"
+        type="text"
+        name="sku"
+        value="{{ it.product_sku or '' }}"
+        autocomplete="off"
+        spellcheck="false"
+        hidden
+        disabled
+        aria-label="Novo SKU"
+    >
+    {% endif %}
+</span>
+<span class="admin-tx__category">{{ it.category or '-' }}</span>
+<span class="admin-table__col--num admin-tx__qty-cell">
+    <span class="admin-tx__qty-view">{{ it.quantity }}</span>
+    {% if editable %}
+    <input
+        class="admin-tx__qty-input admin-table__col--num"
+        type="number"
+        name="quantity"
+        value="{{ it.quantity }}"
+        min="1"
+        step="1"
+        hidden
+        disabled
+        aria-label="Nova quantidade"
+    >
+    {% endif %}
+</span>
+<span class="admin-table__col--num admin-tx__unit-price">
+    {% if it.original_price and it.original_price > it.unit_price + 0.001 %}
+    <span class="admin-tx__price-original">{{ it.original_price | brl }}</span>
+    {% endif %}
+    {{ it.unit_price | brl }}
+</span>
+<span class="admin-table__col--num admin-tx__subtotal"><strong>{{ it.subtotal | brl }}</strong></span>
+{% if editable and tx %}
+<span class="admin-tx__item-actions">
+    <button
+        type="button"
+        class="admin-tx__item-edit"
+        data-tx-item-edit
+        title="Alterar produto"
+        aria-label="Alterar produto do item"
+    >
+        <i class="fa-solid fa-pen" aria-hidden="true"></i>
+    </button>
+    <button
+        type="submit"
+        class="admin-tx__item-confirm"
+        hidden
+        title="Confirmar alteração"
+        aria-label="Confirmar alteração do produto"
+        onclick="return confirm('Substituir este item? O estoque do produto anterior será revertido e o novo SKU será baixado. A nota de retirada será atualizada.');"
+    >
+        <i class="fa-solid fa-check" aria-hidden="true"></i>
+    </button>
+    <button
+        type="button"
+        class="admin-tx__item-cancel"
+        data-tx-item-cancel
+        hidden
+        title="Cancelar"
+        aria-label="Cancelar alteração"
+    >
+        <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+    </button>
+</span>
+{% endif %}
+{% endmacro %}
+
+{% macro admin_tx_discount_summary(tx_items, tx_total) %}
+{% set ns = namespace(lista=0) %}
+{% for it in tx_items %}
+{% set ns.lista = ns.lista + (it.original_price or it.unit_price) * it.quantity %}
+{% endfor %}
+{% set economia = ns.lista - tx_total %}
+{% if economia > 0.009 %}
+<div class="admin-tx__summary-row admin-tx__summary-row--discount">
+    <span>Descontos (promoções)</span>
+    <strong>-{{ economia | brl }}</strong>
+</div>
+{% endif %}
+{% endmacro %}

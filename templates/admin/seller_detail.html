@@ -1,0 +1,678 @@
+{% extends "admin/_layout.html" %}
+{% from "macros/admin_tx_client.html" import admin_tx_client_section %}
+{% from "macros/admin_tx_order_cell.html" import admin_tx_order_cell %}
+{% from "macros/admin_tx_receipt_link.html" import admin_tx_receipt_link %}
+{% from "macros/admin_tx_status_badge.html" import admin_tx_status_badge %}
+{% from "macros/admin_tx_item_cells.html" import admin_tx_item_cells, admin_tx_discount_summary %}
+{% from "macros/admin_tx_delivery.html" import admin_tx_delivery_badge, admin_tx_delivery_section %}
+{% from "macros/admin_tx_handover.html" import admin_tx_handover_action %}
+{% from "macros/admin_tx_note.html" import admin_tx_note_form %}
+{% from "macros/admin_tx_pending_actions.html" import admin_tx_pending_actions %}
+
+{% block title %}{{ seller.name }} - Usuários - Admin | Go Sell{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-users.css') }}">
+{% endblock %}
+
+{% block admin_body %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <div class="admin-seller__title-row">
+                <h1 class="admin-section__title">{{ seller.name }}</h1>
+                {% if seller_events | length > 1 %}
+                {# Filtro de evento: recorta KPIs, análise e vendas desta página. #}
+                {% set sel_ev = (seller_events | selectattr('id', 'equalto', seller_event_filter) | first) if seller_event_filter else none %}
+                {% set sel_label = sel_ev.name if sel_ev else 'Todos os eventos' %}
+                {% set sel_style = (sel_ev.badge_color | event_badge_style) if sel_ev else '' %}
+                <span class="admin-event-nav__badge admin-seller__event-filter"
+                      {% if sel_style %}style="{{ sel_style }}"{% endif %}>
+                    <i class="fa-solid fa-calendar-star admin-event-nav__badge-icon" aria-hidden="true"></i>
+                    <select
+                        class="admin-event-nav__select"
+                        aria-label="Filtrar os dados do vendedor por evento"
+                        title="Filtrar os dados do vendedor por evento"
+                        style="width: {{ [sel_label | length + 1, 8] | max }}ch"
+                        onchange="window.location.href = this.value"
+                    >
+                        <option value="{{ url_for('admin_seller_detail', seller_id=seller.id) }}"
+                                {% if not seller_event_filter %}selected{% endif %}>Todos os eventos</option>
+                        {% for ev in seller_events %}
+                        <option value="{{ url_for('admin_seller_detail', seller_id=seller.id, evento=ev.id) }}"
+                                {% if ev.id == seller_event_filter %}selected{% endif %}
+                        >{{ ev.name }}{% if not ev.active %} (arquivado){% elif ev.operations_closed %} (encerrado){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <i
+                        class="fa-solid fa-chevron-down admin-event-nav__chevron"
+                        role="button"
+                        tabindex="0"
+                        title="Abrir lista de eventos do vendedor"
+                        aria-label="Abrir lista de eventos do vendedor"
+                        onclick="var s=this.previousElementSibling;if(s&&s.tagName==='SELECT'){if(typeof s.showPicker==='function'){s.showPicker();}else{s.focus();s.click();}}"
+                        onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                    ></i>
+                </span>
+                {% endif %}
+            </div>
+            <p class="admin-section__subtitle">
+                <span class="users-role users-role--{{ user.role }}">{{ user.role_label }}</span> &middot;
+                {{ seller.username or seller.email }} &middot;
+                {% if seller.active %}Conta ativa{% else %}Conta inativa{% endif %} &middot;
+                Último login: {{ seller.last_login_at | datahora }}
+            </p>
+        </div>
+    </header>
+
+    {# Blocos de vendas: só para quem vende ou já vendeu (``show_sales``). #}
+    {% if show_sales %}
+    <div class="admin-kpis">
+        <article class="kpi kpi--primary">
+            <span class="kpi__icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
+            <span class="kpi__label">Vendas vinculadas</span>
+            <span class="kpi__value">{{ stats.transactions_count }}</span>
+            <span class="kpi__hint">{{ stats.transactions_today }} hoje</span>
+        </article>
+
+        <article class="kpi kpi--success">
+            <span class="kpi__icon"><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i></span>
+            <span class="kpi__label">Faturamento</span>
+            <span class="kpi__value">{{ stats.total_revenue | brl }}</span>
+            <span class="kpi__hint">{{ stats.revenue_today | brl }} hoje</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span>
+            <span class="kpi__label">Itens vendidos</span>
+            <span class="kpi__value">{{ stats.items_sold }}</span>
+            <span class="kpi__hint">Unidades totais</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-ticket" aria-hidden="true"></i></span>
+            <span class="kpi__label">Ticket médio</span>
+            <span class="kpi__value">
+                {% if stats.transactions_count > 0 %}
+                    {{ (stats.total_revenue / stats.transactions_count) | brl }}
+                {% else %}
+                    {{ 0 | brl }}
+                {% endif %}
+            </span>
+            <span class="kpi__hint">Por venda vinculada</span>
+        </article>
+
+        {% set iv = analytics.intervals %}
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-regular fa-clock" aria-hidden="true"></i></span>
+            <span class="kpi__label">Periodicidade</span>
+            <span class="kpi__value">{{ iv.avg_days | periodicidade if iv.count else '—' }}</span>
+            <span class="kpi__hint">
+                {% if iv.count %}
+                    Média entre vendas &middot; mediana {{ iv.median_days | periodicidade }}
+                {% else %}
+                    Sem duas vendas no mesmo dia de evento
+                {% endif %}
+            </span>
+        </article>
+    </div>
+    {% endif %}
+</section>
+
+{% if show_sales %}
+{# ── Análise do vendedor (d3) ── #}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row admin-section__header--collapsible">
+        <div>
+            <h2 class="admin-section__title">
+                <i class="fa-solid fa-chart-column admin-desktop-only" aria-hidden="true"></i>
+                Análise do vendedor
+            </h2>
+            <p class="admin-section__subtitle">
+                Vendas pagas de {{ analytics.totals.days }} dia(s) de evento
+                {% if analytics.totals.events > 1 %}em {{ analytics.totals.events }} eventos{% endif %}.
+                Pendentes, estornos e cancelamentos não entram.
+            </p>
+        </div>
+        <button
+            type="button"
+            class="admin-section__collapse-toggle"
+            aria-expanded="false"
+            aria-controls="seller-analytics-panel"
+            aria-label="Exibir ou ocultar a análise do vendedor"
+        >
+            <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+        </button>
+    </header>
+
+    <div id="seller-analytics-panel" class="admin-section__panel" hidden>
+    <div class="admin-cust__charts admin-cust__charts--series">
+        <figure class="admin-chart admin-chart--wide" data-admin-chart="seller-by-day">
+            <figcaption class="admin-chart__head">
+                <h3 class="admin-chart__title">
+                    <i class="fa-solid fa-calendar-day" aria-hidden="true"></i>
+                    Vendas por dia de evento
+                </h3>
+                <p class="admin-chart__hint">
+                    Quanto o vendedor faturou em cada dia. Passe o mouse para ver vendas, ticket e ritmo do dia.
+                </p>
+            </figcaption>
+        </figure>
+    </div>
+
+    <div class="admin-cust__charts admin-cust__charts--series">
+        <figure class="admin-chart admin-desktop-only" data-admin-chart="seller-intervals">
+            <figcaption class="admin-chart__head">
+                <h3 class="admin-chart__title">
+                    <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                    Periodicidade entre vendas
+                </h3>
+                <p class="admin-chart__hint">
+                    Quanto tempo passou entre uma venda e a seguinte, por faixa.
+                </p>
+            </figcaption>
+        </figure>
+
+        {# Celular: sem gráfico de faixas — os números do ritmo em lista. #}
+        <article class="admin-card admin-mobile-only">
+            <header class="admin-card__header">
+                <i class="fa-regular fa-clock admin-card__icon" aria-hidden="true"></i>
+                <div>
+                    <h3 class="admin-card__title">Periodicidade entre vendas</h3>
+                    <p class="admin-card__subtitle">Entre vendas do mesmo evento, no mesmo dia.</p>
+                </div>
+            </header>
+            {% if iv.count %}
+            <dl class="admin-customer__dl admin-customer__dl--cols">
+                <div><dt>Intervalo médio</dt><dd>{{ iv.avg_days | periodicidade }}</dd></div>
+                <div><dt>Mediana</dt><dd>{{ iv.median_days | periodicidade }}</dd></div>
+                <div><dt>Menor intervalo</dt><dd>{{ iv.min_days | periodicidade }}</dd></div>
+                <div><dt>Maior intervalo</dt><dd>{{ iv.max_days | periodicidade }}</dd></div>
+            </dl>
+            {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-calendar" aria-hidden="true"></i>
+                <p>Ainda não há duas vendas no mesmo dia de evento para medir.</p>
+            </div>
+            {% endif %}
+        </article>
+
+        <figure class="admin-chart" data-admin-chart="seller-payment-mix">
+            <figcaption class="admin-chart__head">
+                <h3 class="admin-chart__title">
+                    <i class="fa-solid fa-credit-card" aria-hidden="true"></i>
+                    Formas de pagamento
+                </h3>
+                <p class="admin-chart__hint">
+                    Participação de cada meio de pagamento no faturamento do vendedor.
+                </p>
+            </figcaption>
+        </figure>
+    </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row admin-section__header--collapsible">
+        <div>
+            <h2 class="admin-section__title">Dados e acesso</h2>
+            <p class="admin-section__subtitle">
+                Cadastro, senha, status, tipo de usuário e permissões.
+            </p>
+        </div>
+        <button
+            type="button"
+            class="admin-section__collapse-toggle"
+            aria-expanded="true"
+            aria-controls="seller-access-panel"
+            aria-label="Ocultar ou exibir dados e acesso"
+        >
+            <i class="fa-solid fa-chevron-up" aria-hidden="true"></i>
+        </button>
+    </header>
+
+    <div id="seller-access-panel" class="admin-section__panel">
+    {% set fe = seller_form_errors or {} %}
+    {% if seller_form is not none %}
+        {% set v_name = seller_form.name %}
+        {% set v_username = seller_form.username %}
+        {% set v_codvend = seller_form.erp_codvend %}
+        {% set v_active = seller_form.active %}
+        {% set v_password = seller_form.password %}
+        {% set v_event_id = seller_form.event_id %}
+    {% else %}
+        {% set v_name = seller.name %}
+        {% set v_username = seller.username or seller.email %}
+        {% set v_codvend = seller.erp_codvend if seller.erp_codvend is not none else '' %}
+        {% set v_active = seller.active %}
+        {% set v_password = '' %}
+        {% set v_event_id = seller_primary_event_id|string if seller_primary_event_id else '' %}
+    {% endif %}
+    <article class="admin-card">
+        <form
+            method="post"
+            action="{{ url_for('admin_seller_update', seller_id=seller.id) }}"
+            class="admin-card__form"
+            novalidate
+        >
+            {% include 'partials/csrf_field.html' %}
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-name">Nome</label>
+                <input
+                    id="seller-name"
+                    class="admin-field__input{% if fe.name %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="name"
+                    value="{{ v_name }}"
+                    maxlength="120"
+                    required
+                    {% if fe.name %}aria-invalid="true" aria-describedby="detail-seller-name-err"{% endif %}
+                >
+                {% if fe.name %}<p class="admin-field__error" id="detail-seller-name-err">{{ fe.name }}</p>{% endif %}
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-username">Usuário</label>
+                <input
+                    id="seller-username"
+                    class="admin-field__input{% if fe.username %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="username"
+                    value="{{ v_username }}"
+                    maxlength="40"
+                    required
+                    autocomplete="username"
+                    {% if fe.username %}aria-invalid="true" aria-describedby="detail-seller-username-err"{% endif %}
+                >
+                {% if fe.username %}<p class="admin-field__error" id="detail-seller-username-err">{{ fe.username }}</p>{% endif %}
+            </div>
+            <div class="admin-field" data-sell-only>
+                <label class="admin-field__label" for="detail-seller-codvend">Código no ERP (CODVEND)</label>
+                <input
+                    id="detail-seller-codvend"
+                    class="admin-field__input{% if fe.erp_codvend %} admin-field__input--invalid{% endif %}"
+                    type="text"
+                    name="erp_codvend"
+                    inputmode="numeric"
+                    pattern="[0-9]*"
+                    maxlength="10"
+                    placeholder="ex.: 29"
+                    value="{{ v_codvend }}"
+                    {% if fe.erp_codvend %}aria-invalid="true" aria-describedby="detail-seller-codvend-err"{% endif %}
+                >
+                <p class="admin-field__hint">As vendas deste vendedor vão ao ERP com este código. Sem ele, ficam na fila com erro até ser preenchido.</p>
+                {% if fe.erp_codvend %}<p class="admin-field__error" id="detail-seller-codvend-err">{{ fe.erp_codvend }}</p>{% endif %}
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="seller-active">Status</label>
+                <select id="seller-active" name="active" class="admin-field__input">
+                    <option value="1" {% if v_active %}selected{% endif %}>Ativo</option>
+                    <option value="0" {% if not v_active %}selected{% endif %}>Inativo</option>
+                </select>
+            </div>
+            <div class="admin-field" data-sell-only>
+                <label class="admin-field__label" for="seller-detail-event">Evento de venda</label>
+                <select
+                    id="seller-detail-event"
+                    name="event_id"
+                    class="admin-field__input{% if fe.event_id %} admin-field__input--invalid{% endif %}"
+                    {% if fe.event_id %}aria-invalid="true" aria-describedby="detail-seller-event-err"{% endif %}
+                >
+                    <option value="" {% if not v_event_id %}selected{% endif %}>Sem evento (catálogo global)</option>
+                    {% for ev in events_for_seller_form %}
+                    <option
+                        value="{{ ev.id }}"
+                        {% if v_event_id|string == ev.id|string %}selected{% endif %}
+                    >
+                        {{ ev.name }}{% if not ev.active %} (arquivado){% elif ev.operations_closed %} (encerrado){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <p class="admin-field__hint">
+                    Evento em que o usuário vende (catálogo, estoque e vendas do evento).
+                    Cada conta vende em <strong>no máximo um</strong> evento; alterar aqui substitui o vínculo anterior.
+                </p>
+                {% if fe.event_id %}<p class="admin-field__error" id="detail-seller-event-err">{{ fe.event_id }}</p>{% endif %}
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="detail-seller-password">Nova senha</label>
+                <span class="admin-field__wrap admin-field__wrap--has-toggle">
+                    <input
+                        id="detail-seller-password"
+                        class="admin-field__input{% if fe.password %} admin-field__input--invalid{% endif %}"
+                        type="password"
+                        name="password"
+                        minlength="6"
+                        placeholder="Deixe em branco para manter"
+                        value=""
+                        autocomplete="new-password"
+                        data-lpignore="true"
+                        {% if fe.password %}aria-invalid="true" aria-describedby="detail-seller-password-err"{% endif %}
+                    >
+                    <button
+                        type="button"
+                        class="admin-field__toggle-pass"
+                        id="adminSellerDetailTogglePassword"
+                        aria-label="Mostrar senha"
+                        aria-pressed="false"
+                        title="Mostrar senha"
+                    >
+                        <i class="fa-regular fa-eye" aria-hidden="true"></i>
+                    </button>
+                </span>
+                {% if fe.password %}<p class="admin-field__error" id="detail-seller-password-err">{{ fe.password }}</p>{% endif %}
+            </div>
+            {% include 'admin/partials/user_access_fields.html' %}
+            {% if fe.access %}<p class="admin-field__error" role="alert">{{ fe.access }}</p>{% endif %}
+            <button type="submit" class="admin-btn admin-btn--primary admin-btn--block">
+                <i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>
+                Salvar usuário
+            </button>
+        </form>
+    </article>
+    </div>
+</section>
+
+{% if show_sales %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title">Vendas do vendedor</h2>
+            <p class="admin-section__subtitle">
+                Pedidos vinculados a este vendedor. Toque em uma linha para ver itens, retirada pendente e totais.
+            </p>
+        </div>
+    </header>
+
+    <form class="admin-filters" method="get"
+          action="{{ url_for('admin_seller_detail', seller_id=seller.id) }}#lista"
+          data-scroll-to-table data-filter-async>
+        <label class="admin-filter">
+            <span class="admin-filter__label">Status</span>
+            <select name="status" class="admin-filter__input">
+                <option value="todos" {% if filters.status == 'todos' %}selected{% endif %}>Todos</option>
+                <option value="confirmado" {% if filters.status == 'confirmado' %}selected{% endif %}>Pago</option>
+                <option value="pendente" {% if filters.status == 'pendente' %}selected{% endif %}>Pendente</option>
+                <option value="cancelado" {% if filters.status == 'cancelado' %}selected{% endif %}>Cancelado</option>
+                <option value="estornado" {% if filters.status == 'estornado' %}selected{% endif %}>Estornado</option>
+                <option value="entregue" {% if filters.status == 'entregue' %}selected{% endif %}>Entregue</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Entrega futura</span>
+            <select name="entrega" class="admin-filter__input"
+                    title="Pedidos com itens aguardando retirada (estoque ainda não baixado)">
+                <option value="todos" {% if filters.entrega == 'todos' %}selected{% endif %}>Todas</option>
+                <option value="parcial" {% if filters.entrega == 'parcial' %}selected{% endif %}>Retirada pendente</option>
+            </select>
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Data do pedido</span>
+            <input type="date" name="data" class="admin-filter__input"
+                   value="{{ filters.data }}"
+                   title="Filtrar pelo dia da transação; deixe vazio para todos os dias">
+        </label>
+
+        <label class="admin-filter">
+            <span class="admin-filter__label">Por página</span>
+            <select name="per_page" class="admin-filter__input" title="Quantidade de transações por página">
+                {% for n in allowed_per_page %}
+                <option value="{{ n }}" {% if filters.per_page == n %}selected{% endif %}>{{ n }} transações</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <label class="admin-filter admin-filter--wide">
+            <span class="admin-filter__label">Código do pedido</span>
+            <span class="admin-filter__wrap">
+                <i class="fa-solid fa-receipt admin-filter__icon" aria-hidden="true"></i>
+                <input
+                    type="search"
+                    name="pedido"
+                    value="{{ filters.pedido }}"
+                    class="admin-filter__input"
+                    placeholder="Código do pedido, cliente ou parceiro…"
+                    autocomplete="off"
+                    inputmode="search"
+                >
+            </span>
+        </label>
+
+        <input type="hidden" name="page" value="1" aria-hidden="true">
+        {% if filters.evento %}<input type="hidden" name="evento" value="{{ filters.evento }}" aria-hidden="true">{% endif %}
+
+        <div class="admin-filters__actions">
+            <button type="submit" class="admin-btn admin-btn--primary">
+                <i class="fa-solid fa-filter" aria-hidden="true"></i>
+                Aplicar
+            </button>
+            <a href="{{ url_for('admin_seller_detail', seller_id=seller.id, evento=filters.evento) }}" class="admin-btn admin-btn--ghost">Limpar</a>
+        </div>
+    </form>
+
+    <header class="admin-section__header admin-section__header--row" style="margin-top: 8px;">
+        <div>
+            <p class="admin-section__subtitle" style="margin: 0;" data-filter-region="resumo">
+                {% if pagination.total > 0 %}
+                Mostrando <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+                de <strong>{{ pagination.total }}</strong>
+                transação(ões) · página {{ pagination.page }} de {{ pagination.total_pages }}.
+                {% else %}
+                Nenhuma transação para os filtros aplicados.
+                {% endif %}
+            </p>
+        </div>
+    </header>
+
+    {% include 'partials/admin_tx_legend.html' %}
+
+    <div id="lista" class="admin-table admin-table--with-payment" role="table" aria-label="Vendas do vendedor" data-filter-region="tabela">
+        <div class="admin-table__head" role="row">
+            <span class="admin-table__col admin-table__col--toggle" aria-hidden="true"></span>
+            <span class="admin-table__col" role="columnheader">Pedido</span>
+            <span class="admin-table__col" role="columnheader">Data/Hora</span>
+            <span class="admin-table__col admin-table__col--num" role="columnheader">Itens</span>
+            <span class="admin-table__col admin-table__col--num" role="columnheader">Total</span>
+            <span class="admin-table__col" role="columnheader">Pagamento</span>
+            <span class="admin-table__col" role="columnheader">Status</span>
+        </div>
+
+        {% if transactions %}
+            {% for tx in transactions %}
+            <div class="admin-tx" data-tx-id="{{ tx.id }}">
+                <div
+                    class="admin-tx__row"
+                    role="button"
+                    tabindex="0"
+                    aria-expanded="false"
+                    aria-controls="seller-admin-tx-details-{{ tx.id }}"
+                >
+                    <span class="admin-table__col admin-table__col--toggle">
+                        <i class="fa-solid fa-chevron-right admin-tx__chevron" aria-hidden="true"></i>
+                    </span>
+                    {{ admin_tx_order_cell(tx.order_number, tx.client_name) }}
+                    <span class="admin-table__col">{{ tx.created_at | datahora }}</span>
+                    <span class="admin-table__col admin-table__col--num">{{ tx.items_count }}</span>
+                    <span class="admin-table__col admin-table__col--num"><strong>{{ tx.total | brl }}</strong></span>
+                    <span class="admin-table__col">{{ tx.payment_method | paymethod(tx.card_installments) }}</span>
+                    <span class="admin-table__col admin-table__col--num admin-tx__status">
+                        <span class="admin-tx__status-stack">
+                            {{ admin_tx_status_badge(tx) }}
+                            {{ admin_tx_delivery_badge(tx) }}
+                            {{ admin_tx_handover_action(tx, 'admin_seller_confirm_transaction_handover', seller_id=seller.id, writable=(not tx.event_id) or event_ops_open(tx.event_id)) }}
+                            {{ admin_tx_receipt_link(tx) }}
+                            {% if tx.event_id %}
+                            {{ admin_tx_pending_actions(tx, writable=True, cancel_endpoint='admin_event_cancel_pending_transaction', show_restore=False, event_id=tx.event_id) }}
+                            {% endif %}
+                        </span>
+                    </span>
+                </div>
+
+                <div class="admin-tx__details" id="seller-admin-tx-details-{{ tx.id }}" hidden>
+                    <div class="admin-tx__details-inner">
+                        {% set tx_items = tx['items'] %}
+                        <h3 class="admin-tx__details-title">
+                            Itens do pedido
+                            <span class="admin-tx__details-count">
+                                {{ tx_items|length }} produto{% if tx_items|length != 1 %}s{% endif %}
+                            </span>
+                        </h3>
+                        <div class="admin-tx__items">
+                            <div class="admin-tx__items-head">
+                                <span>Produto</span>
+                                <span>SKU</span>
+                                <span class="admin-tx__category">Categoria</span>
+                                <span class="admin-table__col--num">Qtd.</span>
+                                <span class="admin-table__col--num">Unit.</span>
+                                <span class="admin-table__col--num">Subtotal</span>
+                            </div>
+                            {% for it in tx_items %}
+                            {% if tx.status == 'confirmado' and it.product_id and ((not tx.event_id) or event_ops_open(tx.event_id)) %}
+                            <form
+                                class="admin-tx__items-row admin-tx__items-row--editable"
+                                method="post"
+                                action="{{ url_for('admin_transaction_replace_item', tx_id=tx.id, item_id=it.id) }}"
+                            >
+                                {% include 'partials/csrf_field.html' %}
+                                {% if tx.event_id %}
+                                <input type="hidden" name="event_id" value="{{ tx.event_id }}">
+                                {% endif %}
+                                {{ admin_tx_item_cells(it, event_id=tx.event_id, editable=True, tx=tx) }}
+                            </form>
+                            {% else %}
+                            <div class="admin-tx__items-row">
+                                {{ admin_tx_item_cells(it, event_id=tx.event_id) }}
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {{ admin_tx_delivery_section(
+                            tx,
+                            'admin_seller_confirm_item_delivery',
+                            seller_id=seller.id,
+                            batch_endpoint='admin_seller_confirm_items_delivery',
+                            writable=(not tx.event_id) or event_ops_open(tx.event_id)
+                        ) }}
+                        {{ admin_tx_client_section(tx) }}
+                        <div class="admin-tx__summary">
+                            <div class="admin-tx__summary-row">
+                                <span>Forma de pagamento</span>
+                                <strong>{{ tx.payment_method | paymethod(tx.card_installments) }}</strong>
+                            </div>
+                            {% set parcelas_txt = tx.total | parcelas_cartao(tx.payment_method, tx.card_installments) %}
+                            {% if parcelas_txt %}
+                            <div class="admin-tx__summary-row">
+                                <span>Valor das parcelas</span>
+                                <strong>{{ parcelas_txt }}</strong>
+                            </div>
+                            {% endif %}
+                            {% if tx.aut %}
+                            <div class="admin-tx__summary-row">
+                                <span>AUT</span>
+                                <strong><code class="admin-mov__aut">{{ tx.aut }}</code></strong>
+                            </div>
+                            {% endif %}
+                            {{ admin_tx_discount_summary(tx_items, tx.total) }}
+                            <div class="admin-tx__summary-row admin-tx__summary-row--total">
+                                <span>Total da transação</span>
+                                <strong>{{ tx.total | brl }}</strong>
+                            </div>
+                        </div>
+                        <div class="admin-tx__actions">
+                            {{ admin_tx_note_form(tx, 'admin_seller_transaction_note', writable=(not tx.event_id) or event_ops_open(tx.event_id), seller_id=seller.id) }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>
+                    {% if filters.pedido or filters.status != 'todos' or filters.entrega != 'todos' or filters.data %}
+                        Nenhuma venda encontrada para os filtros aplicados.
+                    {% else %}
+                        Nenhuma venda vinculada a este vendedor até o momento.
+                    {% endif %}
+                </p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="admin-filter-region" data-filter-region="paginacao">
+    {% if pagination.total > 0 %}
+    <nav class="admin-pagination" aria-label="Paginação das vendas do vendedor">
+        <p class="admin-pagination__summary">
+            Mostrando
+            <strong>{{ pagination.showing_from }}–{{ pagination.showing_to }}</strong>
+            de <strong>{{ pagination.total }}</strong> transação(ões)
+            · página {{ pagination.page }} de {{ pagination.total_pages }}
+        </p>
+        <div class="admin-pagination__nav">
+            {% if pagination.has_prev %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_seller_detail', seller_id=seller.id, pedido=filters.pedido, status=filters.status, entrega=filters.entrega, data=filters.data, per_page=filters.per_page, evento=filters.evento, page=pagination.page - 1) }}"
+               rel="prev">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                <i class="fa-solid fa-chevron-left" aria-hidden="true"></i>
+                Anterior
+            </span>
+            {% endif %}
+            {% if pagination.has_next %}
+            <a class="admin-btn admin-btn--ghost admin-btn--sm"
+               href="{{ url_for('admin_seller_detail', seller_id=seller.id, pedido=filters.pedido, status=filters.status, entrega=filters.entrega, data=filters.data, per_page=filters.per_page, evento=filters.evento, page=pagination.page + 1) }}"
+               rel="next">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </a>
+            {% else %}
+            <span class="admin-pagination__disabled admin-btn admin-btn--ghost admin-btn--sm" aria-disabled="true">
+                Próxima
+                <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+            </span>
+            {% endif %}
+        </div>
+    </nav>
+    {% endif %}
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block admin_scripts %}
+{% if show_sales %}
+{# Séries da análise do vendedor: JSON inerte lido por admin-charts.js. #}
+<script type="application/json" id="event-analytics-data">{{ charts | tojson }}</script>
+<script src="{{ url_for('static', filename='vendor/d3/d3.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-charts-legacy.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-charts.js') }}"></script>
+{% endif %}
+<script>
+(function () {
+    function bindToggle(inputId, btnId, labelShow, labelHide) {
+        var input = document.getElementById(inputId);
+        var btn = document.getElementById(btnId);
+        if (!input || !btn) return;
+        var icon = btn.querySelector('i');
+        btn.addEventListener('click', function () {
+            var hidden = input.type === 'password';
+            input.type = hidden ? 'text' : 'password';
+            btn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+            btn.setAttribute('aria-label', hidden ? labelHide : labelShow);
+            btn.setAttribute('title', hidden ? labelHide : labelShow);
+            if (icon) {
+                icon.className = hidden ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+            }
+        });
+    }
+    bindToggle('detail-seller-password', 'adminSellerDetailTogglePassword', 'Mostrar senha', 'Ocultar senha');
+})();
+</script>
+<script src="{{ url_for('static', filename='js/admin-user-access.js') }}"></script>
+{% endblock %}

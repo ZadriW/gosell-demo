@@ -1,0 +1,16 @@
+{# Código do pedido como âncora para o histórico de transações (linha aberta).
+   ``tx_url``: URL com filtro ``pedido`` + fragmento ``#tx-<id>``. #}
+{% macro admin_mov_order_ref(reference, tx_url=None) -%}
+{% if reference %}
+  {% if tx_url and tx_url.startswith('/') and not tx_url.startswith('//') %}
+  <a href="{{ tx_url }}"
+     class="admin-mov__order-link"
+     title="Abrir pedido {{ reference }} no histórico de transações"
+     aria-label="Abrir pedido {{ reference }} no histórico de transações">
+    <code>{{ reference }}</code>
+  </a>
+  {% else %}
+  <code>{{ reference }}</code>
+  {% endif %}
+{% endif %}
+{%- endmacro %}

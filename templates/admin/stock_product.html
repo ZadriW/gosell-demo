@@ -1,0 +1,313 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}{{ product.nome }} - Estoque - Admin | Go Sell{% endblock %}
+
+{% block admin_body %}
+<section
+    class="admin-section"
+    data-admin-product
+    data-api-url="{{ url_for('admin_api_stock_product', product_id=product.id) }}"
+>
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">{{ product.nome }}</h1>
+            {% if product.variante %}<p class="admin-section__variant">{{ product.variante }}</p>{% endif %}
+            <p class="admin-section__subtitle">
+                <span class="admin-product__sku">SKU <strong>{{ product.sku }}</strong></span>
+                &middot; #{{ product.id }} &middot; {{ product.categoria }} &middot; {{ product.preco | brl }}
+            </p>
+        </div>
+
+        <div class="admin-product__status" data-product-status>
+            {% if not product.ativo %}
+                <span class="admin-badge admin-badge--neutral">Inativo</span>
+            {% elif product.sem_estoque %}
+                <span class="admin-badge admin-badge--danger">Sem estoque</span>
+            {% elif product.abaixo_minimo %}
+                <span class="admin-badge admin-badge--warn">Abaixo do mínimo</span>
+            {% else %}
+                <span class="admin-badge admin-badge--success">OK</span>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="admin-product">
+        <aside class="admin-product__card">
+            <div class="admin-product__image">
+                <img src="{{ product.imagem }}" alt="{{ product.nome }}" onerror="this.style.visibility='hidden'">
+            </div>
+            <dl class="admin-product__meta">
+                <div>
+                    <dt>SKU</dt>
+                    <dd><code>{{ product.sku }}</code></dd>
+                </div>
+                <div>
+                    <dt>Preço-base</dt>
+                    <dd>{{ product.preco | brl }}</dd>
+                </div>
+                <div>
+                    <dt>Estoque atual</dt>
+                    <dd data-product-stock><strong>{{ product.estoque }}</strong> un.</dd>
+                </div>
+                <div>
+                    <dt>Estoque mínimo</dt>
+                    <dd data-product-min-stock>{{ product.estoque_minimo }} un.</dd>
+                </div>
+                <div>
+                    <dt>Valor em estoque</dt>
+                    <dd data-product-stock-value>{{ (product.estoque * product.preco) | brl }}</dd>
+                </div>
+            </dl>
+
+            <form method="post"
+                  action="{{ url_for('admin_stock_min', product_id=product.id) }}"
+                  class="admin-product__inline-form"
+                  data-live-stock-form>
+                {% include 'partials/csrf_field.html' %}
+                <label class="admin-field__label" for="min_stock">Novo estoque mínimo</label>
+                <div class="admin-product__inline-wrap">
+                    <input id="min_stock" type="number" name="min_stock" min="0" step="1"
+                           value="{{ product.estoque_minimo }}" class="admin-field__input" required>
+                    <button type="submit" class="admin-btn admin-btn--primary">Salvar</button>
+                </div>
+            </form>
+
+            <form method="post"
+                  action="{{ url_for('admin_stock_toggle_active', product_id=product.id) }}"
+                  class="admin-product__toggle"
+                  data-live-stock-form>
+                {% include 'partials/csrf_field.html' %}
+                {% if product.ativo %}
+                    <input type="hidden" name="active" value="0">
+                    <button type="submit" class="admin-btn admin-btn--ghost admin-btn--danger"
+                            data-confirm="Desativar este produto? Ele deixará de aparecer no Go Sell.">
+                        <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                        Desativar produto
+                    </button>
+                {% else %}
+                    <input type="hidden" name="active" value="1">
+                    <button type="submit" class="admin-btn admin-btn--ghost">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        Ativar produto
+                    </button>
+                {% endif %}
+            </form>
+        </aside>
+
+        <div class="admin-product__forms">
+            <article class="admin-card admin-card--entrada">
+                <header class="admin-card__header">
+                    <i class="fa-solid fa-down-long admin-card__icon admin-card__icon--positive" aria-hidden="true"></i>
+                    <div>
+                        <h2 class="admin-card__title">Entrada de estoque</h2>
+                        <p class="admin-card__subtitle">Compra, reposição ou recebimento do fornecedor.</p>
+                    </div>
+                </header>
+                <form method="post"
+                      action="{{ url_for('admin_stock_entry', product_id=product.id) }}"
+                      class="admin-card__form"
+                      data-live-stock-form>
+                    {% include 'partials/csrf_field.html' %}
+                    <div class="admin-field">
+                        <label class="admin-field__label" for="entrada-qty">Quantidade</label>
+                        <input id="entrada-qty" type="number" name="quantity" min="1" step="1"
+                               class="admin-field__input" required>
+                    </div>
+                    <div class="admin-field">
+                        <label class="admin-field__label" for="entrada-cost">Custo unitário (opcional)</label>
+                        <input id="entrada-cost" type="number" name="unit_cost" min="0" step="0.01"
+                               class="admin-field__input" placeholder="Ex.: 12,50">
+                    </div>
+                    <div class="admin-field admin-field--wide">
+                        <label class="admin-field__label" for="entrada-reason">Observação</label>
+                        <input id="entrada-reason" type="text" name="reason" maxlength="160"
+                               class="admin-field__input" placeholder="Ex.: NF 12345 — fornecedor X">
+                    </div>
+                    <button type="submit" class="admin-btn admin-btn--primary admin-btn--block">
+                        <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                        Registrar entrada
+                    </button>
+                </form>
+            </article>
+
+            <article class="admin-card admin-card--saida">
+                <header class="admin-card__header">
+                    <i class="fa-solid fa-up-long admin-card__icon admin-card__icon--negative" aria-hidden="true"></i>
+                    <div>
+                        <h2 class="admin-card__title">Saída de estoque</h2>
+                        <p class="admin-card__subtitle">Perda, quebra, vencimento, devolução ao fornecedor.</p>
+                    </div>
+                </header>
+                <form method="post"
+                      action="{{ url_for('admin_stock_exit', product_id=product.id) }}"
+                      class="admin-card__form"
+                      data-confirm="Confirmar saída manual de estoque?"
+                      data-live-stock-form>
+                    {% include 'partials/csrf_field.html' %}
+                    <div class="admin-field">
+                        <label class="admin-field__label" for="saida-qty">Quantidade</label>
+                        <input id="saida-qty" type="number" name="quantity" min="1" step="1"
+                               max="{{ product.estoque }}"
+                               class="admin-field__input" required>
+                    </div>
+                    <div class="admin-field admin-field--wide">
+                        <label class="admin-field__label" for="saida-reason">Motivo <span class="admin-field__required">*</span></label>
+                        <input id="saida-reason" type="text" name="reason" maxlength="160"
+                               class="admin-field__input" required
+                               placeholder="Ex.: Produto vencido">
+                    </div>
+                    <button type="submit" class="admin-btn admin-btn--warn admin-btn--block"
+                            {% if product.estoque <= 0 %}disabled{% endif %}>
+                        <i class="fa-solid fa-minus" aria-hidden="true"></i>
+                        Registrar saída
+                    </button>
+                </form>
+            </article>
+
+            <article class="admin-card admin-card--ajuste">
+                <header class="admin-card__header">
+                    <i class="fa-solid fa-scale-balanced admin-card__icon" aria-hidden="true"></i>
+                    <div>
+                        <h2 class="admin-card__title">Ajuste de inventário</h2>
+                        <p class="admin-card__subtitle">Conferência física: informe o saldo correto.</p>
+                    </div>
+                </header>
+                <form method="post"
+                      action="{{ url_for('admin_stock_adjust', product_id=product.id) }}"
+                      class="admin-card__form"
+                      data-confirm="Ajustar o estoque para o valor informado?"
+                      data-live-stock-form>
+                    {% include 'partials/csrf_field.html' %}
+                    <div class="admin-field">
+                        <label class="admin-field__label" for="ajuste-stock">Novo saldo</label>
+                        <input id="ajuste-stock" type="number" name="new_stock" min="0" step="1"
+                               class="admin-field__input" required
+                               value="{{ product.estoque }}">
+                    </div>
+                    <div class="admin-field admin-field--wide">
+                        <label class="admin-field__label" for="ajuste-reason">Motivo <span class="admin-field__required">*</span></label>
+                        <input id="ajuste-reason" type="text" name="reason" maxlength="160"
+                               class="admin-field__input" required
+                               placeholder="Ex.: Contagem do inventário mensal">
+                    </div>
+                    <button type="submit" class="admin-btn admin-btn--ghost admin-btn--block">
+                        <i class="fa-solid fa-check" aria-hidden="true"></i>
+                        Aplicar ajuste
+                    </button>
+                </form>
+            </article>
+        </div>
+    </div>
+</section>
+
+<section class="admin-section">
+    <header class="admin-section__header">
+        <h2 class="admin-section__title">Histórico de movimentações</h2>
+        <p class="admin-section__subtitle">
+            Últimas {{ movements|length }} {% if movements|length == 1 %}movimentação{% else %}movimentações{% endif %} deste produto.
+        </p>
+    </header>
+
+    <div class="admin-table" role="table" aria-label="Movimentações do produto" data-product-movements>
+        <div class="admin-table__head admin-mov__row" role="row">
+            <span role="columnheader">Data/Hora</span>
+            <span role="columnheader">Tipo</span>
+            <span role="columnheader" class="admin-table__col--num">Delta</span>
+            <span role="columnheader" class="admin-table__col--num">Saldo após</span>
+            <span role="columnheader">Motivo / Ref.</span>
+            <span role="columnheader">Usuário</span>
+        </div>
+
+        {% if movements %}
+            {% for m in movements %}
+            <div class="admin-mov__wrapper" data-movement-id="{{ m.id }}">
+                <div class="admin-mov__row" role="row">
+                    <span>{{ m.created_at | datahora }}</span>
+                    <span class="admin-mov__type-cell">
+                        <span class="admin-badge admin-mov__badge admin-mov__badge--{{ m.movement_type }}">
+                            {{ m.movement_type | movlabel }}
+                        </span>
+                        {% if m.movement_type == 'venda' and m.transaction_id %}
+                            <button type="button" class="admin-mov__toggle" data-toggle="{{ m.id }}" aria-expanded="false" aria-controls="details-{{ m.id }}" aria-label="Exibir ou ocultar dados do cliente">
+                                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                            </button>
+                        {% endif %}
+                    </span>
+                    <span class="admin-table__col--num admin-mov__delta admin-mov__delta--{% if m.delta > 0 %}positive{% else %}negative{% endif %}">
+                        {{ m.delta | signed }}
+                    </span>
+                    <span class="admin-table__col--num"><strong>{{ m.balance_after }}</strong></span>
+                    <span class="admin-mov__reason">
+                        {% if m.reference %}<code>{{ m.reference }}</code>{% endif %}
+                        {{ m.reason or '-' }}
+                    </span>
+                    <span class="admin-mov__user-cell">
+                        {{ m.created_by | display_created_by or '-' }}
+                        {% if m.movement_type == 'venda' and m.reference %}
+                            <a
+                                href="{{ url_for('receipt', order_number=m.reference) }}"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                class="admin-mov__note-btn"
+                                title="Abrir nota de retirada ({{ m.reference }})"
+                                aria-label="Abrir nota de retirada do pedido {{ m.reference }}"
+                            >
+                                <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+                            </a>
+                        {% endif %}
+                    </span>
+                </div>
+                {% if m.movement_type == 'venda' and m.transaction_id %}
+                <div class="admin-mov__details" id="details-{{ m.id }}" hidden>
+                    <div class="admin-mov__details-content">
+                        <h4 class="admin-mov__details-title">
+                            <i class="fa-solid fa-user" aria-hidden="true"></i>
+                            Dados do cliente (pedido)
+                        </h4>
+                        <dl class="admin-mov__details-list">
+                            <div class="admin-mov__details-item">
+                                <dt>Nome</dt>
+                                <dd>{{ m.client_name or '—' }}</dd>
+                            </div>
+                        <div class="admin-mov__details-item">
+                            <dt>CPF</dt>
+                            <dd>{{ m.client_cpf or '—' }}</dd>
+                        </div>
+                        <div class="admin-mov__details-item">
+                            <dt>Forma de pagamento</dt>
+                            <dd>{{ m.payment_method | paymethod }}</dd>
+                        </div>
+                        <div class="admin-mov__details-item">
+                            <dt>CEP</dt>
+                                <dd>{{ m.client_zipcode or '—' }}</dd>
+                            </div>
+                            <div class="admin-mov__details-item admin-mov__details-item--wide">
+                                <dt>Endereço</dt>
+                                <dd>
+                                    {% if m.client_address or m.client_number or m.client_city %}
+                                        {{ m.client_address or '—' }}{% if m.client_number %}, {{ m.client_number }}{% endif %}{% if m.client_complement %} — {{ m.client_complement }}{% endif %}<br>
+                                        {{ m.client_city or '—' }}{% if m.client_state %} — {{ m.client_state }}{% endif %}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="admin-empty">
+                <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                <p>Nenhuma movimentação registrada.</p>
+            </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-stock-live.js') }}?v=confirm1"></script>
+{% endblock %}

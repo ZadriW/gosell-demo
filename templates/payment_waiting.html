@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "macros/admin_brand_logo.html" import admin_brand_logo %}
+
+{% block title %}Aguardando pagamento | Go Sell{% endblock %}
+
+{% block head %}
+{% include 'partials/totem_theme_head.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/payment.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/idle-timeout.css') }}">
+{% endblock %}
+
+{% block body %}
+<div class="payment">
+    <header class="payment__topbar">
+        <button type="button" class="payment__back" id="waitingBack">
+            <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+            <span id="waitingBackLabel">Voltar ao resumo</span>
+        </button>
+        <a class="payment__brand" href="{{ payment_home_url }}" aria-label="Go Sell">
+            {{ admin_brand_logo() }}
+        </a>
+    </header>
+
+    <main class="payment-wait" id="waitingContent">
+        <div class="payment-wait__hero">
+            <div class="payment-wait__pulse" aria-hidden="true">
+                <i class="fa-solid fa-credit-card"></i>
+            </div>
+            <h1 class="payment-wait__title" id="waitingTitle">Aguardando pagamento</h1>
+            <p class="payment-wait__lead" id="waitingLead">
+                Utilize a <strong>maquininha</strong> ao lado do Go Sell para concluir o pagamento
+                (<strong>PIX</strong> ou <strong>cartão</strong>, conforme selecionado no passo anterior).
+                Quando a operação for aprovada na maquininha, toque no botão abaixo para registrar
+                a venda e liberar a nota de retirada.
+            </p>
+        </div>
+
+        <section class="payment-wait__card">
+            <h2 class="payment-wait__card-title">
+                <i class="fa-solid fa-receipt" aria-hidden="true"></i>
+                Seu pedido
+            </h2>
+            <div class="payment__items payment-wait__items" id="waitingItems"></div>
+            <div class="payment-wait__total-row payment-wait__method-row">
+                <span>Forma de pagamento</span>
+                <strong id="waitingPaymentMethod">—</strong>
+            </div>
+            <div class="payment-wait__total-row">
+                <span>Total a pagar</span>
+                <strong id="waitingTotal">R$ 0,00</strong>
+            </div>
+            <p class="payment-wait__hint">
+                <span id="waitingCount">0</span> unidade(s) no pedido
+            </p>
+        </section>
+
+        <div class="payment-wait__actions">
+            <button type="button" class="payment__btn payment__btn--primary" id="waitingConfirm">
+                <i class="fa-solid fa-check" aria-hidden="true"></i>
+                <span id="waitingConfirmLabel">Pagamento realizado</span>
+            </button>
+        </div>
+    </main>
+
+    {# Tela de AUT — exibida após clicar em "Pagamento realizado" #}
+    <section class="payment-aut" id="autSection" hidden aria-hidden="true">
+        <div class="payment-aut__card">
+            <div class="payment-aut__icon" aria-hidden="true">
+                <i class="fa-solid fa-key"></i>
+            </div>
+            <h2 class="payment-aut__title">Digite o código AUT</h2>
+            <p class="payment-aut__resume-hint" id="autResumeOrderHint" hidden></p>
+            <p class="payment-aut__lead">
+                Informe o código de autorização (<strong>AUT</strong>) exibido na
+                maquininha após a aprovação do pagamento.
+            </p>
+            <div class="payment-aut__field">
+                <label class="payment-aut__label" for="autInput">Código AUT</label>
+                <input
+                    type="text"
+                    id="autInput"
+                    class="payment-aut__input"
+                    inputmode="text"
+                    autocomplete="off"
+                    maxlength="60"
+                    placeholder="Ex.: 123456"
+                    aria-describedby="autError"
+                >
+                <p class="payment-aut__error" id="autError" role="alert" hidden></p>
+            </div>
+            <div class="payment-aut__actions">
+                <button type="button" class="payment__btn payment__btn--primary" id="autSave">
+                    <i class="fa-solid fa-check" aria-hidden="true"></i>
+                    Salvar AUT
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section class="payment__success" id="paymentSuccess" hidden aria-hidden="true">
+        <div class="payment__success-card">
+            <div class="payment__success-icon">
+                <i class="fa-solid fa-check" aria-hidden="true"></i>
+            </div>
+            <h2 class="payment__success-title">Pagamento confirmado!</h2>
+            <p class="payment__success-text">
+                Retire a nota impressa e apresente no balcão para retirar seus produtos.
+                <br>
+                O Go Sell retornará ao painel do vendedor em <span id="successCountdown">30</span>s.
+            </p>
+            <div class="payment__success-order" id="successOrder">Pedido #—</div>
+            <div class="payment-backorder-note" id="successPendingDelivery" hidden></div>
+            <div class="payment__success-actions">
+                <button type="button" class="payment__btn payment__btn--secondary" id="successPrint">
+                    <i class="fa-solid fa-print" aria-hidden="true"></i>
+                    Imprimir nota
+                </button>
+                <button type="button" class="payment__btn payment__btn--primary" id="successFinish">
+                    Finalizar agora
+                </button>
+            </div>
+        </div>
+    </section>
+</div>
+{% include 'partials/checkout_idle_lock.html' %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/totem-api-errors.js') }}"></script>
+{% set boot_payload = {
+    '__TOTEM_FLOW__': totem_flow or {},
+    '__PENDING_AUT_RESUME__': resume_pending_aut,
+    '__SELLER_BACKORDER__': seller_backorder or false,
+    '__CART_SCOPE__': totem_cart_scope(),
+    '__GIFT_RULES__': cart_gift_rules(),
+    '__CHECKOUT_HOLD_MODE__': 'publish'
+} %}
+{% include 'partials/json_boot.html' %}
+<script src="{{ url_for('static', filename='js/promo-pricing.js') }}"></script>
+<script src="{{ url_for('static', filename='js/cart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment-form.js') }}"></script>
+<script src="{{ url_for('static', filename='js/payment-waiting.js') }}"></script>
+<script src="{{ url_for('static', filename='js/checkout-hold.js') }}"></script>
+<script src="{{ url_for('static', filename='js/idle-timeout.js') }}"></script>
+{% endblock %}

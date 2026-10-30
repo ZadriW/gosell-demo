@@ -1,0 +1,192 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}{{ product.nome }} - Produtos - Admin | Go Sell{% endblock %}
+
+{% block admin_main_class %} admin-main--product-detail{% endblock %}
+
+{% block admin_head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-product-page.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-movements-table.css') }}">
+{% endblock %}
+
+{#
+    Estilos em static/css/admin-product-page.css (.admin-prodv).
+    O admin-stock-live.js atualiza ao vivo os [data-product-*], o botão de
+    .admin-product__toggle e insere linhas .admin-mov__wrapper no histórico.
+#}
+{% block admin_body %}
+{% set name_key = ((product.nome or '')|lower).split()|join(' ') %}
+<section
+    class="admin-section admin-prodv"
+    data-admin-product
+    data-api-url="{{ url_for('admin_api_products_detail', product_id=product.id) }}"
+>
+    {# ---------- Identidade do produto ---------- #}
+    <article class="admin-prodv__hero">
+        <div class="admin-prodv__image">
+            {% if product.imagem %}
+            <img class="admin-stock__thumb admin-prodv__img" src="{{ product.imagem }}" alt="{{ product.nome }}"
+                 data-lightbox-label="{{ product.nome }}" onerror="this.style.visibility='hidden'">
+            {% endif %}
+        </div>
+
+        <div class="admin-prodv__identity">
+            <p class="admin-prodv__eyebrow">
+                <i class="fa-solid fa-book-open" aria-hidden="true"></i>
+                Biblioteca de produtos
+            </p>
+            <h1 class="admin-prodv__title">{{ product.nome }}</h1>
+            {% if product.variante and ((product.variante|lower).split()|join(' ')) != name_key %}
+            <p class="admin-prodv__variant">{{ product.variante }}</p>
+            {% endif %}
+            <ul class="admin-prodv__chips">
+                <li class="admin-prodv__chip admin-prodv__chip--code">SKU <code>{{ product.sku }}</code></li>
+                <li class="admin-prodv__chip">ID {{ product.id }}</li>
+                {% if product.categoria %}<li class="admin-prodv__chip"><i class="fa-solid fa-layer-group" aria-hidden="true"></i>{{ product.categoria }}</li>{% endif %}
+            </ul>
+        </div>
+
+        <div class="admin-prodv__flags">
+            <div class="admin-product__status admin-prodv__status" data-product-status>
+                {% if not product.ativo %}
+                    <span class="admin-badge admin-badge--neutral">Inativo</span>
+                {% elif product.sem_estoque %}
+                    <span class="admin-badge admin-badge--danger">Sem estoque</span>
+                {% elif product.abaixo_minimo %}
+                    <span class="admin-badge admin-badge--warn">Abaixo do mínimo</span>
+                {% else %}
+                    <span class="admin-badge admin-badge--success">OK</span>
+                {% endif %}
+            </div>
+            <form method="post"
+                  action="{{ url_for('admin_product_toggle_active', product_id=product.id) }}"
+                  class="admin-product__toggle admin-prodv__toggle-inline"
+                  data-live-stock-form>
+                {% include 'partials/csrf_field.html' %}
+                {% if product.ativo %}
+                    <input type="hidden" name="active" value="0">
+                    <button type="submit" class="admin-btn admin-btn--ghost admin-btn--danger"
+                            data-confirm="Desativar este produto? Ele deixará de aparecer no Go Sell.">
+                        <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                        Desativar produto
+                    </button>
+                {% else %}
+                    <input type="hidden" name="active" value="1">
+                    <button type="submit" class="admin-btn admin-btn--ghost">
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                        Ativar produto
+                    </button>
+                {% endif %}
+            </form>
+        </div>
+    </article>
+
+    {# ---------- Indicadores (soma de todos os eventos) ---------- #}
+    <dl class="admin-prodv__stats">
+        <div class="admin-prodv__stat admin-prodv__stat--stock">
+            <dt><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>Estoque nos eventos</dt>
+            <dd data-product-stock><strong>{{ product.estoque }}</strong> un.</dd>
+        </div>
+        <div class="admin-prodv__stat">
+            <dt><i class="fa-solid fa-arrow-down-short-wide" aria-hidden="true"></i>Mínimo (referência)</dt>
+            <dd data-product-min-stock>{{ product.estoque_minimo }} un.</dd>
+        </div>
+        <div class="admin-prodv__stat">
+            <dt><i class="fa-solid fa-tag" aria-hidden="true"></i>Preço-base</dt>
+            <dd>{{ product.preco | brl }}</dd>
+        </div>
+        <div class="admin-prodv__stat">
+            <dt><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i>Valor (eventos × preço)</dt>
+            <dd data-product-stock-value>{{ (product.estoque * product.preco) | brl }}</dd>
+        </div>
+    </dl>
+
+    <p class="admin-prodv__notice">
+        <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        <span>
+            Quantidades são a <strong>soma de todos os eventos</strong>. O preço de venda é definido em cada
+            evento; aqui fica só o preço-base. Para entrada, saída ou ajuste, abra o produto no estoque do evento.
+        </span>
+    </p>
+
+    <section class="admin-prodv--history" aria-labelledby="product-movements-heading">
+        <header class="admin-prodv__section-head">
+            <div>
+                <h2 id="product-movements-heading" class="admin-prodv__heading admin-prodv__heading--lg">
+                    <i class="fa-solid fa-clock-rotate-left" aria-hidden="true"></i>
+                    Histórico de movimentações
+                </h2>
+                <p class="admin-prodv__section-sub">
+                    Últimas {{ movements|length }} {% if movements|length == 1 %}movimentação{% else %}movimentações{% endif %} deste produto, com o evento de cada operação.
+                </p>
+            </div>
+        </header>
+
+        {# Linhas no mesmo markup que o admin-stock-live.js insere ao vivo (renderProductMovementRow). #}
+        <div
+            class="admin-table admin-product__movements-table admin-movv admin-movv--events"
+            role="table"
+            aria-label="Movimentações do produto"
+            data-product-movements
+            data-movements-live
+        >
+            <div class="admin-table__head admin-mov__row admin-mov__row--with-event" role="row">
+                <span role="columnheader">Data/Hora</span>
+                <span role="columnheader">Tipo</span>
+                <span role="columnheader">Evento</span>
+                <span role="columnheader" class="admin-table__col--num">Delta</span>
+                <span role="columnheader" class="admin-table__col--num">Saldo após</span>
+                <span role="columnheader">Motivo / Ref.</span>
+                <span role="columnheader">Usuário</span>
+            </div>
+
+            {% if movements %}
+                {% for m in movements %}
+                <div class="admin-mov__wrapper" data-movement-id="{{ m.id }}">
+                    <div class="admin-mov__row admin-mov__row--with-event" role="row">
+                        <span>{{ m.created_at | datahora }}</span>
+                        <span class="admin-mov__type-cell">
+                            <span class="admin-badge admin-mov__badge admin-mov__badge--{{ m.movement_type }}">
+                                {{ m.movement_type | movlabel }}
+                            </span>
+                        </span>
+                        <span class="admin-mov__event-cell">
+                            {% if m.event_id and m.event_name %}
+                                {% set row_ev_style = m.event_badge_color | event_badge_style %}
+                                <span class="admin-nav__event-badge admin-mov__event-badge" title="Evento #{{ m.event_id }}"{% if row_ev_style %} style="{{ row_ev_style }}"{% endif %}>
+                                    {{ m.event_name }}
+                                </span>
+                            {% elif m.event_id %}
+                                <span class="admin-mov__event-unknown" title="Evento #{{ m.event_id }} (cadastro indisponível)">#{{ m.event_id }}</span>
+                            {% else %}
+                                <span class="admin-mov__event-none" title="Movimentação no estoque global do catálogo (sem evento)">—</span>
+                            {% endif %}
+                        </span>
+                        <span class="admin-table__col--num admin-mov__delta admin-mov__delta--{% if m.delta > 0 %}positive{% elif m.delta < 0 %}negative{% else %}neutral{% endif %}">
+                            {{ m.delta | signed }}
+                        </span>
+                        <span class="admin-table__col--num"><strong>{{ m.balance_after }}</strong></span>
+                        <span class="admin-mov__reason">
+                            {% if m.reference %}<code>{{ m.reference }}</code>{% endif %}
+                            {{ m.reason or '-' }}
+                        </span>
+                        <span class="admin-mov__user-cell">
+                            {{ m.created_by | display_created_by or '-' }}
+                        </span>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="admin-empty">
+                    <i class="fa-regular fa-folder-open" aria-hidden="true"></i>
+                    <p>Nenhuma movimentação registrada.</p>
+                </div>
+            {% endif %}
+        </div>
+    </section>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-stock-live.js') }}?v=confirm1"></script>
+{% endblock %}

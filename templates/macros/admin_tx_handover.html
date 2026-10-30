@@ -1,0 +1,41 @@
+{# Confirmação de entrega do pedido inteiro (retirada no balcão pelo cliente).
+   Independente da retirada pendente por item (que continua exigindo baixa de
+   estoque via admin_tx_delivery). Fica à esquerda do ícone da nota. #}
+{% macro admin_tx_handover_action(tx, endpoint, event_id=None, seller_id=None, writable=True) -%}
+{% if (tx.status or '')|lower == 'confirmado' %}
+{% if (tx.handover_status or '')|lower == 'entregue' %}
+<span class="admin-tx__handover-done"
+      title="Pedido entregue{% if tx.handover_confirmed_at %} em {{ tx.handover_confirmed_at | datahora }}{% endif %}"
+      aria-label="Pedido entregue">
+    <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+</span>
+{% elif writable %}
+<form method="post"
+      {% if event_id %}
+      action="{{ url_for(endpoint, event_id=event_id, tx_id=tx.id) }}"
+      {% elif seller_id %}
+      action="{{ url_for(endpoint, seller_id=seller_id, tx_id=tx.id) }}"
+      {% else %}
+      action="{{ url_for(endpoint, tx_id=tx.id) }}"
+      {% endif %}
+      class="admin-tx__handover-form"
+      data-confirm="Confirmar a entrega deste pedido? O status mudará para “Entregue”."
+      data-confirm-title="Confirmar entrega do pedido"
+      data-confirm-label="Continuar"
+      data-confirm-destructive="false"
+      data-confirm-double
+      data-confirm-second="Confirmação final: marcar este pedido como entregue ao cliente? Esta ação não pode ser desfeita pelo painel."
+      data-confirm-second-title="Confirmação final"
+      data-confirm-second-label="Sim, marcar como entregue"
+      data-confirm-second-destructive="false">
+    {% include 'partials/csrf_field.html' %}
+    <button type="submit"
+            class="admin-tx__handover-btn"
+            title="Confirmar entrega do pedido"
+            aria-label="Confirmar entrega do pedido">
+        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+    </button>
+</form>
+{% endif %}
+{% endif %}
+{%- endmacro %}

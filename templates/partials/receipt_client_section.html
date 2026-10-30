@@ -1,0 +1,39 @@
+{% if tx.client_name or tx.client_cpf or tx.client_zipcode or tx.client_address or (cro and cro.get('numero_registro')) %}
+<div class="receipt__section">
+    <div class="receipt__section-title">Dados do cliente</div>
+    <div class="receipt__client-rows">
+        {% if tx.client_name %}
+        <div class="receipt__client-row">
+            <span class="receipt__client-key">Nome</span>
+            <span class="receipt__client-val">{{ tx.client_name }}</span>
+        </div>
+        {% endif %}
+        {% if tx.client_cpf %}
+        <div class="receipt__client-row">
+            <span class="receipt__client-key">CPF</span>
+            <span class="receipt__client-val">{{ tx.client_cpf }}</span>
+        </div>
+        {% endif %}
+        {% if tx.client_zipcode %}
+        <div class="receipt__client-row">
+            <span class="receipt__client-key">CEP</span>
+            <span class="receipt__client-val">{{ tx.client_zipcode }}</span>
+        </div>
+        {% endif %}
+        {% if tx.client_address %}
+        <div class="receipt__client-row">
+            <span class="receipt__client-key">Endereço</span>
+            <span class="receipt__client-val">
+                {{ tx.client_address }}{% if tx.client_number %}, {{ tx.client_number }}{% endif %}{% if tx.client_complement %} — {{ tx.client_complement }}{% endif %}{% if tx.client_neighborhood %}, {{ tx.client_neighborhood }}{% endif %}{% if tx.client_city %}, {{ tx.client_city }}{% endif %}{% if tx.client_state %} — {{ tx.client_state }}{% endif %}
+            </span>
+        </div>
+        {% endif %}
+        {% if cro and cro.get('numero_registro') %}
+        <div class="receipt__client-row">
+            <span class="receipt__client-key">CRO</span>
+            <span class="receipt__client-val">{{ cro['numero_registro'] }}</span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

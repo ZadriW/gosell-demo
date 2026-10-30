@@ -1,0 +1,15 @@
+{# Link para nota de retirada — apenas vendas confirmadas com número de pedido. #}
+{% macro admin_tx_receipt_link(tx) -%}
+{% if tx.status == 'confirmado' and tx.order_number %}
+<a
+    href="{{ receipt_url(tx.order_number) }}"
+    target="_blank"
+    rel="noopener noreferrer"
+    class="admin-mov__note-btn"
+    title="Abrir nota de retirada ({{ tx.order_number }})"
+    aria-label="Abrir nota de retirada do pedido {{ tx.order_number }}"
+>
+    <i class="fa-solid fa-clipboard-list" aria-hidden="true"></i>
+</a>
+{% endif %}
+{%- endmacro %}

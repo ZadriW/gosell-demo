@@ -1,0 +1,71 @@
+{#
+    Tipo, permissões e eventos do painel no formulário de usuário (criar e editar).
+    Espera: user_access, presets, permission_catalog, event_scoped_permissions,
+    events_for_panel (contexto de _user_form_context no app.py).
+
+    Nos tipos pré-definidos as caixas mostram as permissões do tipo (e não vão
+    no POST); marcar ou desmarcar uma caixa muda o tipo para Personalizado.
+    Comportamento: static/js/admin-user-access.js · estilos: css/admin-users.css.
+#}
+{% set ua = user_access %}
+{% set preset_perms = {} %}
+{% for key, p in presets.items() %}{% set _ = preset_perms.update({key: {'permissions': p.permissions, 'all_events': p.all_events}}) %}{% endfor %}
+<div class="ua" data-user-access data-presets="{{ preset_perms|tojson|forceescape }}">
+    <fieldset class="ua__block">
+        <legend class="admin-field__label">Tipo de usuário</legend>
+        <div class="ua__roles" role="radiogroup" aria-label="Tipo de usuário">
+            {% for key, p in presets.items() %}
+            <label class="ua__role ua__role--{{ key }}">
+                <input type="radio" name="role" value="{{ key }}" {% if ua.role == key %}checked{% endif %} data-ua-role>
+                <span class="ua__role-text">
+                    <strong>{{ p.label }}</strong>
+                    <small>{{ p.hint }}</small>
+                </span>
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
+
+    <fieldset class="ua__block">
+        <legend class="admin-field__label">Permissões</legend>
+        <p class="admin-field__hint" data-ua-perm-hint></p>
+        {% for group in ['Vendas', 'Evento', 'Painel'] %}
+        <div class="ua__group">
+            <p class="ua__group-title">{{ {'Vendas': 'Vendas', 'Evento': 'Dentro de cada evento', 'Painel': 'Painel geral'}[group] }}</p>
+            <div class="ua__perms">
+                {% for key, label, g, hint in permission_catalog if g == group %}
+                <label class="ua__perm">
+                    <input type="checkbox" name="permissions" value="{{ key }}" {% if key in ua.permissions %}checked{% endif %}
+                           data-ua-perm{% if key in event_scoped_permissions %} data-ua-event-scoped{% endif %}>
+                    <span class="ua__perm-text">
+                        <strong>{{ label }}</strong>
+                        <small>{{ hint }}</small>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </fieldset>
+
+    <fieldset class="ua__block" data-ua-events>
+        <legend class="admin-field__label">Eventos no painel</legend>
+        <p class="admin-field__hint">Em quais eventos valem as permissões “dentro de cada evento”.</p>
+        <label class="ua__all">
+            <input type="checkbox" name="all_events" value="1" {% if ua.all_events %}checked{% endif %} data-ua-all-events>
+            <span>Todos os eventos <small>(inclusive os criados depois)</small></span>
+        </label>
+        {% if events_for_panel %}
+        <div class="ua__events" data-ua-event-list>
+            {% for ev in events_for_panel %}
+            <label class="ua__event">
+                <input type="checkbox" name="panel_event_id" value="{{ ev.id }}" {% if ev.id in ua.event_ids %}checked{% endif %}>
+                <span>{{ ev.name }}{% if ev.operations_closed %} <small>(encerrado)</small>{% endif %}</span>
+            </label>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="admin-field__hint" role="status">Não há eventos ativos. <a href="{{ url_for('admin_events') }}">Crie um evento</a>.</p>
+        {% endif %}
+    </fieldset>
+</div>

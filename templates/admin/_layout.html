@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+{% from "macros/admin_brand_logo.html" import admin_brand_logo %}
+
+{#
+    Layout compartilhado do painel administrativo (produtos, eventos,
+    vendedores, financeiro). Fornece topbar + menu + container de flash messages.
+    Páginas devem sobrescrever {% block admin_body %}.
+
+    Abas, menu e ações aparecem conforme as permissões do usuário
+    (``can(permissão, event_id)``, ver _can no app.py / database/users.py).
+#}
+{% set _tab_perm = {
+    'dashboard': 'dashboard', 'estoque': 'estoque', 'movimentacoes': 'estoque',
+    'transacoes': 'transacoes_ver', 'promocoes': 'promocoes', 'clientes': 'clientes',
+} %}
+
+{% block head %}
+{% include 'partials/theme_init.html' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin-filters.css') }}">
+{% block admin_head %}{% endblock %}
+{% endblock %}
+
+{% block body %}
+<div class="admin-shell{% if active_event_tab is defined and event is defined %} admin-shell--event{% endif %}"{% if active_event_tab is defined and event is defined %} data-op-noun="{{ event|op_noun }}" data-op-noun-l="{{ event|op_noun(lower=True) }}"{% endif %}>
+    <header class="admin-topbar">
+        <div class="admin-topbar__brand">
+            <a class="admin-topbar__brand-link" href="{{ admin_home_url|default(url_for('admin_events'), true) }}">
+                {{ admin_brand_logo() }}
+                <span class="admin-topbar__badge">{{ 'Admin' if not panel_account or panel_account.role == 'administrador' else panel_account.role_label }}</span>
+            </a>
+            {% if active_event_tab is defined and event is defined %}
+            {% set ev_badge_style = event.badge_color | event_badge_style %}
+            {% set event_nav_closed = event.active and event.operations_closed %}
+            {% set event_nav_label = event.name ~ ('' if event.active else ' (arquivado)') ~ (' (encerrado)' if event_nav_closed else '') %}
+            <span
+                class="admin-event-nav__badge{% if not event.active %} admin-event-nav__badge--archived{% elif event.operations_closed %} admin-event-nav__badge--closed{% endif %}"
+                {% if ev_badge_style %} style="{{ ev_badge_style }}"{% endif %}
+            >
+                <i class="fa-solid fa-calendar-star admin-event-nav__badge-icon" aria-hidden="true"></i>
+                <select
+                    class="admin-event-nav__select"
+                    aria-label="Trocar de {{ event|op_noun(lower=True) }}"
+                    title="Trocar de {{ event|op_noun(lower=True) }}"
+                    style="width: {{ [event_nav_label|length + 1, 8]|max }}ch"
+                    onchange="window.location.href = this.value"
+                >
+                    {% set _event_tab_route = {
+                        'dashboard': 'admin_event_detail',
+                        'estoque': 'admin_event_stock',
+                        'movimentacoes': 'admin_event_movements',
+                        'transacoes': 'admin_event_transactions',
+                        'promocoes': 'admin_event_promotions',
+                        'clientes': 'admin_event_customers',
+                    } %}
+                    {% set _switch_endpoint = _event_tab_route.get(active_event_tab, 'admin_event_detail') %}
+                    {% set _switch_perm = _tab_perm.get(active_event_tab, 'dashboard') %}
+                    {% for ev in all_events %}
+                    <option
+                        value="{{ url_for(_switch_endpoint, event_id=ev.id) if can(_switch_perm, ev.id) else (event_home_url(ev.id) or url_for(_switch_endpoint, event_id=ev.id)) }}"
+                        {% if ev.id == event.id %}selected{% endif %}
+                        >{{ ev.name }}{% if not ev.active %} (arquivado){% elif ev.operations_closed %} (encerrado){% endif %}</option>
+                    {% endfor %}
+                </select>
+                <i
+                    class="fa-solid fa-chevron-down admin-event-nav__chevron"
+                    role="button"
+                    tabindex="0"
+                    title="Abrir lista de {{ event|op_noun(plural=True, lower=True) }}"
+                    aria-label="Abrir lista de {{ event|op_noun(plural=True, lower=True) }}"
+                    onclick="var s=this.previousElementSibling;if(s&&s.tagName==='SELECT'){if(typeof s.showPicker==='function'){s.showPicker();}else{s.focus();s.click();}}"
+                    onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}"
+                ></i>
+            </span>
+            {% endif %}
+        </div>
+
+        {% if active_event_tab is defined and event is defined %}
+        {# ── Nav do evento (desktop): seções; badge do evento fica no brand ── #}
+        <nav class="admin-nav admin-nav--event" aria-label="Seções do {{ event|op_noun(lower=True) }}">
+            <div class="admin-event-nav__links">
+                {% if can('dashboard', event.id) %}
+                <a class="admin-nav__item {% if active_event_tab == 'dashboard' %}is-active{% endif %}"
+                   href="{{ url_for('admin_event_detail', event_id=event.id) }}" title="Dashboard do {{ event|op_noun(lower=True) }}">
+                    <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+                    <span>Dashboard</span>
+                </a>
+                {% endif %}
+                {% if can('estoque', event.id) %}
+                <a class="admin-nav__item {% if active_event_tab == 'estoque' %}is-active{% endif %}"
+                   href="{{ url_for('admin_event_stock', event_id=event.id) }}" title="Estoque do {{ event|op_noun(lower=True) }}">
+                    <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>
+                    <span>Estoque</span>
+                </a>
+                {% endif %}
+                {% if can('transacoes_ver', event.id) %}
+                <a class="admin-nav__item {% if active_event_tab in ('transacoes', 'movimentacoes') %}is-active{% endif %}"
+                   href="{{ url_for('admin_event_transactions', event_id=event.id) }}" title="Transações do {{ event|op_noun(lower=True) }}">
+                    <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+                    <span>Transações</span>
+                </a>
+                {% endif %}
+                {% if can('promocoes', event.id) %}
+                <a class="admin-nav__item {% if active_event_tab == 'promocoes' %}is-active{% endif %}"
+                   href="{{ url_for('admin_event_promotions', event_id=event.id) }}" title="Promoções do {{ event|op_noun(lower=True) }}">
+                    <i class="fa-solid fa-tag" aria-hidden="true"></i>
+                    <span>Promoções</span>
+                </a>
+                {% endif %}
+                {% if can('clientes', event.id) %}
+                <a class="admin-nav__item {% if active_section == 'clientes' %}is-active{% endif %}"
+                   href="{{ url_for('admin_event_customers', event_id=event.id) }}" title="Clientes do {{ event|op_noun(lower=True) }}">
+                    <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+                    <span>Clientes</span>
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+        {% else %}
+        {# ── Nav global do painel admin (desktop) ── #}
+        <nav class="admin-nav admin-nav--admin" aria-label="Seções do painel">
+            <div class="admin-nav__grid">
+                {% if can('produtos') %}
+                <a class="admin-nav__item {% if active_section == 'produtos' %}is-active{% endif %}"
+                   href="{{ url_for('admin_products') }}">
+                    <i class="fa-solid fa-tags" aria-hidden="true"></i>
+                    Produtos
+                </a>
+                {% endif %}
+                {% if can('eventos') %}
+                <a class="admin-nav__item {% if active_section == 'eventos' %}is-active{% endif %}"
+                   href="{{ url_for('admin_events') }}">
+                    <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                    Eventos
+                </a>
+                {% endif %}
+                {% if can('usuarios') %}
+                <a class="admin-nav__item {% if active_section == 'usuarios' %}is-active{% endif %}"
+                   href="{{ url_for('admin_sellers') }}">
+                    <i class="fa-solid fa-users" aria-hidden="true"></i>
+                    Usuários
+                </a>
+                {% endif %}
+                {% if can('financeiro') %}
+                <a class="admin-nav__item {% if active_section == 'financeiro' %}is-active{% endif %}"
+                   href="{{ url_for('admin_financeiro') }}">
+                    <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+                    Financeiro
+                </a>
+                {% endif %}
+                {% if can('erp') %}
+                <a class="admin-nav__item {% if active_section == 'erp' %}is-active{% endif %}"
+                   href="{{ url_for('admin_erp') }}">
+                    <i class="fa-solid fa-plug" aria-hidden="true"></i>
+                    Integração ERP
+                </a>
+                {% endif %}
+            </div>
+        </nav>
+        {% endif %}
+
+        <div class="admin-topbar__meta">
+            <span class="admin-topbar__user">
+                <i class="fa-solid fa-user" aria-hidden="true"></i>
+                {{ admin_user }}
+            </span>
+            <span class="admin-topbar__clock">
+                <i class="fa-regular fa-clock" aria-hidden="true"></i>
+                {{ now.strftime('%d/%m/%Y %H:%M') }}
+            </span>
+            {% if current_user and current_user.can_sell %}
+            <a class="admin-topbar__reset-btn admin-topbar__sell-link" href="{{ url_for('seller_sale') }}" title="Ir para o catálogo de vendas">
+                <i class="fa-solid fa-cart-shopping" aria-hidden="true"></i>
+                <span class="admin-topbar__reset-label">Vender</span>
+            </a>
+            {% endif %}
+            {% if can('reiniciar') %}
+            <button
+                type="button"
+                class="admin-topbar__reset-btn"
+                data-admin-reset-open
+                title="Reiniciar sistema"
+                aria-label="Reiniciar sistema ao estado padrão"
+            >
+                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                <span class="admin-topbar__reset-label">Reiniciar</span>
+            </button>
+            {% endif %}
+            <button
+                type="button"
+                class="admin-topbar__theme-toggle"
+                data-admin-theme-toggle
+                aria-pressed="false"
+                title="Modo escuro"
+                aria-label="Ativar modo escuro"
+            >
+                <i class="fa-solid fa-moon" aria-hidden="true"></i>
+            </button>
+            <form method="post" action="{{ url_for('logout') }}" class="admin-topbar__logout-form">
+                {% include 'partials/csrf_field.html' %}
+                <button
+                    type="submit"
+                    class="admin-topbar__logout"
+                    title="Sair"
+                    aria-label="Sair do Go Sell"
+                >
+                    <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
+                    <span class="admin-topbar__logout-label">Sair</span>
+                </button>
+            </form>
+        </div>
+    </header>
+
+    <main class="admin-main{% block admin_main_class %}{% endblock %}">
+        {% if event is defined %}
+        {% include 'partials/admin_event_ops_banner.html' %}
+        {% endif %}
+
+        {# ── Trilha de navegação (caminho percorrido + voltar) ── #}
+        {% if totem_trail_enabled|default(true) %}
+        {% set trail_root_href = admin_home_url|default(url_for('admin_events'), true) %}
+        {% set trail_root_label = 'Início do painel' %}
+        {% include 'partials/admin_trail.html' %}
+        {% endif %}
+
+        {% block admin_body %}{% endblock %}
+    </main>
+
+    {# ── Navegação inferior mobile (≤767px); no desktop usa admin-nav na topbar ── #}
+    <nav class="admin-bottom-nav{% if active_event_tab is defined and event is defined %} admin-bottom-nav--event{% else %} admin-bottom-nav--admin{% endif %}"
+         aria-label="{% if active_event_tab is defined and event is defined %}Seções do {{ event|op_noun(lower=True) }}{% else %}Seções do painel{% endif %}">
+        {% if active_event_tab is defined and event is defined %}
+        {% if can('dashboard', event.id) %}
+        <a class="admin-bottom-nav__item {% if active_event_tab == 'dashboard' %}is-active{% endif %}"
+           href="{{ url_for('admin_event_detail', event_id=event.id) }}" title="Dashboard do {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-gauge-high" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Dashboard</span>
+        </a>
+        {% endif %}
+        {% if can('estoque', event.id) %}
+        <a class="admin-bottom-nav__item {% if active_event_tab == 'estoque' %}is-active{% endif %}"
+           href="{{ url_for('admin_event_stock', event_id=event.id) }}" title="Estoque do {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Estoque</span>
+        </a>
+        {% endif %}
+        {% if can('transacoes_ver', event.id) %}
+        <a class="admin-bottom-nav__item {% if active_event_tab in ('transacoes', 'movimentacoes') %}is-active{% endif %}"
+           href="{{ url_for('admin_event_transactions', event_id=event.id) }}" title="Transações do {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-file-invoice-dollar" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Transações</span>
+        </a>
+        {% endif %}
+        {% if can('promocoes', event.id) %}
+        <a class="admin-bottom-nav__item {% if active_event_tab == 'promocoes' %}is-active{% endif %}"
+           href="{{ url_for('admin_event_promotions', event_id=event.id) }}" title="Promoções do {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-tag" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Promoções</span>
+        </a>
+        {% endif %}
+        {% if can('clientes', event.id) %}
+        <a class="admin-bottom-nav__item {% if active_section == 'clientes' %}is-active{% endif %}"
+           href="{{ url_for('admin_event_customers', event_id=event.id) }}" title="Clientes do {{ event|op_noun(lower=True) }}">
+            <i class="fa-solid fa-address-book" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Clientes</span>
+        </a>
+        {% endif %}
+        {% else %}
+        {% if can('produtos') %}
+        <a class="admin-bottom-nav__item {% if active_section == 'produtos' %}is-active{% endif %}"
+           href="{{ url_for('admin_products') }}">
+            <i class="fa-solid fa-tags" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Produtos</span>
+        </a>
+        {% endif %}
+        {% if can('eventos') %}
+        <a class="admin-bottom-nav__item {% if active_section == 'eventos' %}is-active{% endif %}"
+           href="{{ url_for('admin_events') }}">
+            <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Eventos</span>
+        </a>
+        {% endif %}
+        {% if can('usuarios') %}
+        <a class="admin-bottom-nav__item {% if active_section == 'usuarios' %}is-active{% endif %}"
+           href="{{ url_for('admin_sellers') }}">
+            <i class="fa-solid fa-users" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Usuários</span>
+        </a>
+        {% endif %}
+        {% if can('financeiro') %}
+        <a class="admin-bottom-nav__item {% if active_section == 'financeiro' %}is-active{% endif %}"
+           href="{{ url_for('admin_financeiro') }}">
+            <i class="fa-solid fa-chart-pie" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">Financeiro</span>
+        </a>
+        {% endif %}
+        {% if can('erp') %}
+        <a class="admin-bottom-nav__item {% if active_section == 'erp' %}is-active{% endif %}"
+           href="{{ url_for('admin_erp') }}">
+            <i class="fa-solid fa-plug" aria-hidden="true"></i>
+            <span class="admin-bottom-nav__badge">ERP</span>
+        </a>
+        {% endif %}
+        {% endif %}
+    </nav>
+    {% include 'partials/admin_flashes.html' %}
+</div>
+
+{% include 'partials/admin_confirm_dialog.html' %}
+
+{% if can('reiniciar') %}
+<dialog
+    class="admin-modal admin-modal--reset"
+    id="admin-reset-dialog"
+    aria-labelledby="admin-reset-dialog-title"
+    aria-describedby="admin-reset-dialog-desc"
+>
+    <div class="admin-modal__panel admin-reset-modal__panel">
+        <header class="admin-modal__header admin-reset-modal__header">
+            <h2 class="admin-modal__title" id="admin-reset-dialog-title">Reiniciar sistema</h2>
+            <button
+                type="button"
+                class="admin-modal__close"
+                data-admin-reset-close
+                aria-label="Fechar"
+            >
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="admin-modal__body admin-reset-modal__body">
+            <div class="admin-reset-modal__icon" aria-hidden="true">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <p class="admin-reset-modal__desc" id="admin-reset-dialog-desc">
+                Esta ação restaura a demonstração ao estado inicial:
+                eventos <strong>Feira Demo Go Sell</strong> e <strong>Congresso Demo Go Sell</strong>,
+                produtos, promoções, brindes, usuários, clientes, vendas de exemplo e a fila do ERP simulado.
+                <strong>Tudo o que foi feito nesta sessão será apagado.</strong>
+            </p>
+            <form
+                method="post"
+                action="{{ url_for('admin_reset_system') }}"
+                class="admin-reset-form"
+                id="adminResetForm"
+            >
+                {% include 'partials/csrf_field.html' %}
+                <label class="admin-reset-confirm">
+                    <input type="checkbox" name="confirm_reset" value="1" id="adminResetConfirm">
+                    <span>Entendo que esta operação é irreversível e desejo reiniciar o sistema.</span>
+                </label>
+            </form>
+        </div>
+        <footer class="admin-modal__footer admin-reset-modal__footer">
+            <button type="button" class="admin-btn admin-btn--ghost" data-admin-reset-close>
+                Cancelar
+            </button>
+            <button
+                type="submit"
+                form="adminResetForm"
+                class="admin-btn admin-btn--danger-solid"
+                id="adminResetSubmit"
+                disabled
+            >
+                <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                Reiniciar sistema
+            </button>
+        </footer>
+    </div>
+</dialog>
+{% endif %}
+
+<dialog
+    id="admin-image-lightbox"
+    class="admin-image-lightbox"
+    aria-labelledby="admin-image-lightbox-title"
+>
+    <div class="admin-image-lightbox__panel" role="document">
+        <header class="admin-image-lightbox__header">
+            <p id="admin-image-lightbox-title" class="admin-image-lightbox__title">Imagem do produto</p>
+            <button
+                type="button"
+                class="admin-image-lightbox__close"
+                data-admin-image-lightbox-close
+                aria-label="Fechar visualização"
+            >
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+            </button>
+        </header>
+        <div class="admin-image-lightbox__body">
+            <img class="admin-image-lightbox__img" src="" alt="">
+        </div>
+    </div>
+</dialog>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/totem-api-errors.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-theme.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin.js') }}?v=confirm1"></script>
+<script src="{{ url_for('static', filename='js/admin-filters.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-image-lightbox.js') }}"></script>
+<script src="{{ url_for('static', filename='js/admin-reset.js') }}"></script>
+{% block admin_scripts %}{% endblock %}
+{% endblock %}

@@ -1,0 +1,49 @@
+{#
+    Trilha de navegação (breadcrumb) dos painéis admin e vendedor.
+
+    Contexto esperado (injetado por ``_inject_totem_trail`` em app.py):
+      - totem_trail      : lista de {url, label, is_current} do caminho percorrido
+      - totem_trail_back : URL da página anterior ("" quando não há)
+
+    Definido pelo layout que inclui este partial:
+      - trail_root_href  : link do início do painel (ícone de casa)
+      - trail_root_label : rótulo acessível do início do painel
+
+    A barra só aparece quando existe caminho a mostrar (2+ páginas), ou seja,
+    o primeiro acesso de cada sessão não ganha ruído visual.
+#}
+{% if totem_trail and totem_trail|length > 1 %}
+{% set _trail_root_href = trail_root_href|default('', true) %}
+{% set _trail_root_label = trail_root_label|default('Início do painel', true) %}
+<nav class="admin-trail" aria-label="Caminho percorrido até esta página">
+    {% if totem_trail_back %}
+    <a class="admin-trail__back"
+       href="{{ totem_trail_back }}"
+       title="Voltar para a página anterior"
+       aria-label="Voltar para a página anterior">
+        <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    </a>
+    {% endif %}
+    <ol class="admin-trail__list">
+        {% if _trail_root_href %}
+        <li class="admin-trail__item admin-trail__item--home">
+            <a class="admin-trail__link admin-trail__link--home"
+               href="{{ _trail_root_href }}"
+               title="{{ _trail_root_label }}"
+               aria-label="{{ _trail_root_label }}">
+                <i class="fa-solid fa-house" aria-hidden="true"></i>
+            </a>
+        </li>
+        {% endif %}
+        {% for item in totem_trail %}
+        <li class="admin-trail__item{% if item.is_current %} is-current{% endif %}">
+            {% if item.is_current %}
+            <span class="admin-trail__current" aria-current="page" title="{{ item.label }}">{{ item.label }}</span>
+            {% else %}
+            <a class="admin-trail__link" href="{{ item.url }}" title="{{ item.label }}">{{ item.label }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</nav>
+{% endif %}

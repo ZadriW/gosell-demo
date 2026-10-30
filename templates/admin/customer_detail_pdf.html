@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ customer.name }} - Clientes | Go Sell</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/fonts-local.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin.css') }}">
+    <style>
+        body { margin: 0; background: #fff; }
+        @page { size: A4 portrait; margin: 12mm 16mm; }
+    </style>
+</head>
+<body>
+
+{# Botões de controle — ocultos na impressão #}
+<button class="fin-pdf__print-btn" onclick="window.print()">
+    <i class="fa-solid fa-print" aria-hidden="true"></i>
+    Imprimir / Salvar PDF
+</button>
+
+<a class="fin-pdf__back-btn" href="{{ back_url }}">
+    <i class="fa-solid fa-arrow-left" aria-hidden="true"></i>
+    Voltar
+</a>
+
+<div class="fin-pdf">
+
+    {# ── Cabeçalho ─────────────────────────────────────────────────────── #}
+    <header class="fin-pdf__header">
+        <div class="fin-pdf__brand">
+            <img src="{{ url_for('static', filename='images/logo-gosell.svg') }}" alt="Go Sell">
+        </div>
+        <div class="fin-pdf__meta">
+            <div class="fin-pdf__event-name">{{ customer.name }}</div>
+            <div class="fin-pdf__period">Perfil de cliente — {{ event.name }}</div>
+            {% if customer.event_filter %}
+            <div class="fin-pdf__period">
+                Histórico, produtos, pagamentos, ritmo e vendedores filtrados por
+                {{ customer.scope.event_name or 'Evento #' ~ customer.scope.event_id }};
+                resumo e eventos cobrem todas as compras.
+            </div>
+            {% endif %}
+            <div class="fin-pdf__generated">
+                Relatório gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }}
+            </div>
+        </div>
+    </header>
+
+    {# ── Dados de contato ─────────────────────────────────────────────── #}
+    {% if customer.cpf or customer.cro_numero or customer.email or customer.phone or customer.city %}
+    <div style="margin-bottom:20px;padding:10px 16px;background:#f5f6fb;border-radius:8px;
+                font-size:12px;color:#374151;border:1px solid #e5e7eb">
+        {% if customer.cpf %}<strong style="color:#0e7490">CPF:</strong> {{ customer.cpf }}{% endif %}
+        {% if customer.cro_numero %}
+            &nbsp;&bull;&nbsp; <strong style="color:#0e7490">CRO:</strong> {{ customer.cro_uf }} {{ customer.cro_numero }}
+        {% endif %}
+        {% if customer.codparc %}
+            &nbsp;&bull;&nbsp; <strong style="color:#0e7490">Parceiro ERP:</strong> {{ customer.codparc }}
+        {% endif %}
+        {% if customer.email %}
+            &nbsp;&bull;&nbsp; <strong style="color:#0e7490">E-mail:</strong> {{ customer.email }}
+        {% endif %}
+        {% if customer.phone %}
+            &nbsp;&bull;&nbsp; <strong style="color:#0e7490">Telefone:</strong> {{ customer.phone }}
+        {% endif %}
+        {% if customer.city %}
+            &nbsp;&bull;&nbsp; <strong style="color:#0e7490">Cidade/UF:</strong>
+            {{ customer.city }}{% if customer.state %}/{{ customer.state }}{% endif %}
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {# ── KPIs ──────────────────────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Resumo do cliente</div>
+        <div class="fin-pdf__kpis">
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Faturamento do cliente</div>
+                <div class="fin-pdf__kpi-value">{{ customer.revenue | brl }}</div>
+                <div class="fin-pdf__kpi-hint">{{ customer.revenue_share }}% do faturamento total</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Compras confirmadas</div>
+                <div class="fin-pdf__kpi-value">{{ customer.orders_count }}</div>
+                <div class="fin-pdf__kpi-hint">
+                    {{ customer.units }} unid. &middot; {{ customer.distinct_products }} produto(s)
+                </div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Ticket médio</div>
+                <div class="fin-pdf__kpi-value">{{ customer.avg_ticket | brl }}</div>
+                <div class="fin-pdf__kpi-hint">Maior pedido: {{ customer.max_order_total | brl }}</div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Periodicidade</div>
+                <div class="fin-pdf__kpi-value">{{ customer.avg_interval_days | periodicidade }}</div>
+                <div class="fin-pdf__kpi-hint">
+                    {% if customer.intervals.count %}
+                        Média de {{ customer.intervals.count }} intervalo(s)
+                    {% else %}
+                        Sem intervalo para medir
+                    {% endif %}
+                </div>
+            </div>
+            <div class="fin-pdf__kpi">
+                <div class="fin-pdf__kpi-label">Última compra</div>
+                <div class="fin-pdf__kpi-value">{{ customer.days_since_last | desdeontem }}</div>
+                <div class="fin-pdf__kpi-hint">{{ customer.last_purchase_at | datahora }}</div>
+            </div>
+        </div>
+    </section>
+
+    {# ── Participação + Ritmo de compra ───────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__grid-2">
+            <div>
+                <div class="fin-pdf__section-title">Participação no faturamento</div>
+                <table class="fin-pdf__table">
+                    <tbody>
+                        <tr>
+                            <td>Faturamento do cliente</td>
+                            <td class="num"><strong>{{ customer.revenue | brl }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Faturamento total do sistema</td>
+                            <td class="num">{{ customer.total_revenue_all | brl }}</td>
+                        </tr>
+                        <tr>
+                            <td>Participação</td>
+                            <td class="num"><strong>{{ customer.revenue_share }}%</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Eventos em que comprou</td>
+                            <td class="num">{{ customer.events_count }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <div class="fin-pdf__section-title">Ritmo de compra</div>
+                {% if customer.intervals.count %}
+                <table class="fin-pdf__table">
+                    <tbody>
+                        <tr>
+                            <td>Intervalo médio</td>
+                            <td class="num"><strong>{{ customer.intervals.avg_days | periodicidade }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td>Mediana</td>
+                            <td class="num">{{ customer.intervals.median_days | periodicidade }}</td>
+                        </tr>
+                        <tr>
+                            <td>Menor intervalo</td>
+                            <td class="num">{{ customer.intervals.min_days | periodicidade }}</td>
+                        </tr>
+                        <tr>
+                            <td>Maior intervalo</td>
+                            <td class="num">{{ customer.intervals.max_days | periodicidade }}</td>
+                        </tr>
+                        <tr>
+                            <td>Primeira compra</td>
+                            <td class="num">{{ customer.first_purchase_at | datahora }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:#9ca3af;font-size:12px">
+                    Cliente com uma única compra ({{ customer.first_purchase_at | datahora }}).
+                    Não há intervalo para calcular periodicidade.
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    {# ── Produtos mais comprados ──────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">Produtos mais comprados</div>
+        {% if customer.top_products %}
+        <table class="fin-pdf__table">
+            <thead>
+                <tr>
+                    <th>Produto</th>
+                    <th style="width:90px">SKU</th>
+                    <th class="num" style="width:70px">Unidades</th>
+                    <th class="num" style="width:70px">Pedidos</th>
+                    <th class="num" style="width:90px">Valor</th>
+                    <th class="num" style="width:70px">% cliente</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in customer.top_products %}
+                <tr>
+                    <td>
+                        <strong>{{ p.product_name }}</strong>
+                        {% if p.category %}<br><small style="color:#9ca3af">{{ p.category }}</small>{% endif %}
+                    </td>
+                    <td style="font-size:11px;color:#6b7280">{{ p.product_sku or '—' }}</td>
+                    <td class="num"><strong>{{ p.units }}</strong></td>
+                    <td class="num">{{ p.orders }}</td>
+                    <td class="num">{{ p.revenue | brl }}</td>
+                    <td class="num">{{ p.share }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#9ca3af;font-size:12px">Nenhum item confirmado para este cliente.</p>
+        {% endif %}
+    </section>
+
+    {# ── Pagamento, eventos e vendedores ──────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__grid-3">
+            <div>
+                <div class="fin-pdf__section-title">Formas de pagamento</div>
+                {% if customer.payments %}
+                <table class="fin-pdf__table">
+                    <tbody>
+                        {% for p in customer.payments %}
+                        <tr>
+                            <td>{{ p.method | paymethod }}</td>
+                            <td class="num">{{ p.orders }}p &middot; {{ p.share }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:#9ca3af;font-size:11px">Sem dados.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <div class="fin-pdf__section-title">Eventos</div>
+                {% if customer.events %}
+                <table class="fin-pdf__table">
+                    <tbody>
+                        {% for e in customer.events %}
+                        <tr>
+                            <td>{{ e.event_name or 'Evento #' ~ e.event_id if e.event_id else 'Sem evento' }}</td>
+                            <td class="num">{{ e.orders }}p &middot; {{ e.share }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:#9ca3af;font-size:11px">Sem dados.</p>
+                {% endif %}
+            </div>
+
+            <div>
+                <div class="fin-pdf__section-title">Atendido por</div>
+                {% if customer.sellers %}
+                <table class="fin-pdf__table">
+                    <tbody>
+                        {% for s in customer.sellers %}
+                        <tr>
+                            <td>{{ s.seller_name }}</td>
+                            <td class="num">{{ s.orders }}p &middot; {{ s.revenue | brl }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="color:#9ca3af;font-size:11px">Sem dados.</p>
+                {% endif %}
+            </div>
+        </div>
+    </section>
+
+    {# ── Histórico de pedidos ─────────────────────────────────────────── #}
+    <section class="fin-pdf__section">
+        <div class="fin-pdf__section-title">
+            Histórico de pedidos ({{ customer.orders | length }})
+        </div>
+        {% if customer.orders %}
+        <table class="fin-pdf__table">
+            <thead>
+                <tr>
+                    <th>Pedido</th>
+                    <th style="width:100px">Data</th>
+                    <th style="width:70px">Status</th>
+                    <th class="num" style="width:40px">Itens</th>
+                    <th class="num" style="width:80px">Total</th>
+                    <th style="width:100px">Pagamento</th>
+                    <th>Evento</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in customer.orders %}
+                <tr>
+                    <td><strong>{{ o.order_number }}</strong></td>
+                    <td style="font-size:11px">{{ o.created_at | datahora }}</td>
+                    <td style="font-size:11px">
+                        {% if o.status == 'confirmado' %}Pago
+                        {% elif o.status == 'pendente' %}Pendente
+                        {% elif o.status == 'estornado' %}Estornado
+                        {% else %}Cancelado{% endif %}
+                    </td>
+                    <td class="num">{{ o.items_count }}</td>
+                    <td class="num"><strong>{{ o.total | brl }}</strong></td>
+                    <td style="font-size:11px">{{ o.payment_method | paymethod(o.card_installments) }}</td>
+                    <td style="font-size:11px">
+                        {% if o.event_id %}{{ o.event_name or 'Evento #' ~ o.event_id }}{% else %}—{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p style="color:#9ca3af;font-size:12px">Nenhum pedido registrado.</p>
+        {% endif %}
+    </section>
+
+    {# ── Rodapé ────────────────────────────────────────────────────────── #}
+    <footer class="fin-pdf__footer">
+        Relatório de cliente — {{ customer.name }}
+        — Gerado em {{ now.strftime('%d/%m/%Y às %H:%M') if now else '' }} pelo sistema Go Sell
+    </footer>
+
+</div>
+
+{# Font Awesome para ícones dos botões (somente no browser) #}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/fontawesome/all.min.css') }}" media="screen">
+
+</body>
+</html>

@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Go Sell — Demonstração{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/welcome.css') }}">
+{% endblock %}
+
+{% block body %}
+<main class="welcome">
+    <div class="welcome__card">
+        <img
+            class="welcome__logo"
+            src="{{ url_for('static', filename='images/logo-gosell.svg') }}"
+            alt="Go Sell"
+        >
+        <p class="welcome__tagline">Venda assistida para feiras e eventos</p>
+        {# Já logado: "Entrar" leva direto ao painel dessa conta; a âncora troca de usuário. #}
+        {% set active_account = panel_account or (current_user if current_user and current_user.can_sell else none) %}
+        <div class="welcome__access" role="group" aria-label="Formas de acesso">
+            <a class="welcome__access-btn welcome__access-btn--seller" href="{{ url_for('login') }}">
+                <i class="fa-solid fa-right-to-bracket" aria-hidden="true"></i>
+                {% if active_account %}Continuar como {{ active_account.name }}{% else %}Entrar{% endif %}
+            </a>
+            {% if active_account %}
+            <a class="welcome__switch" href="{{ url_for('login', trocar=1) }}">
+                <i class="fa-solid fa-user-group" aria-hidden="true"></i>
+                Fazer login com usuário diferente
+            </a>
+            {% endif %}
+        </div>
+        <aside class="welcome__credentials" aria-label="Contas da demonstração">
+            <p class="welcome__credentials-title">Contas da demo (senha <strong>demo</strong>)</p>
+            <ul class="welcome__credentials-list">
+                <li><strong>Administrador</strong> — admin / demo</li>
+                <li><strong>Vendedores</strong> — ana / demo · bruno / demo</li>
+                <li><strong>Marketing</strong> — marina / demo</li>
+                <li><strong>Personalizado</strong> (estoque e transações) — carlos / demo</li>
+            </ul>
+        </aside>
+    </div>
+    <footer class="welcome__footer">
+        <span>Go Sell — demonstração comercial. Dados fictícios.</span>
+    </footer>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    try { sessionStorage.removeItem('totem_cart_v1'); } catch (_) {}
+</script>
+{% endblock %}

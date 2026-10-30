@@ -1,0 +1,249 @@
+{% extends "admin/_layout.html" %}
+{% from 'macros/admin_event_operation_type.html' import event_operation_type_field %}
+
+{% block title %}Eventos de Estoque - Admin | Go Sell{% endblock %}
+
+{% block admin_body %}
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h1 class="admin-section__title">Eventos de Estoque</h1>
+            <p class="admin-section__subtitle">
+                {{ events | length }} evento(s) ativo(s)
+                {% if events_archived %}&middot; {{ events_archived | length }} arquivado(s){% endif %}
+            </p>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button
+                type="button"
+                class="admin-btn admin-btn--primary"
+                aria-expanded="false"
+                aria-controls="form-novo-evento"
+                onclick="
+                    const panel = document.getElementById('form-novo-evento');
+                    const open = panel.hidden;
+                    panel.hidden = !open;
+                    this.setAttribute('aria-expanded', open);
+                    if (open) panel.querySelector('[name=name]').focus();
+                "
+            >
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                Novo evento
+            </button>
+        </div>
+    </header>
+
+    {# --- Formulário de criação (oculto por padrão) --- #}
+    <div id="form-novo-evento" class="admin-card admin-card--form" hidden>
+        <h2 class="admin-card__title">Criar novo evento</h2>
+        <form method="post" action="{{ url_for('admin_event_create') }}" class="admin-card__form">
+            {% include 'partials/csrf_field.html' %}
+            <div class="admin-field">
+                <label class="admin-field__label" for="new-event-name">Nome do evento <span aria-hidden="true">*</span></label>
+                <input
+                    id="new-event-name"
+                    type="text"
+                    name="name"
+                    class="admin-field__input"
+                    placeholder="Ex.: Feira Demo 2027"
+                    required
+                    maxlength="200"
+                    autocomplete="off"
+                >
+            </div>
+            {{ event_operation_type_field('new-event-operation-type', 'evento') }}
+            <div class="admin-field">
+                <label class="admin-field__label" for="new-event-desc">Descrição (opcional)</label>
+                <input
+                    id="new-event-desc"
+                    type="text"
+                    name="description"
+                    class="admin-field__input"
+                    placeholder="Data, local ou observações"
+                    maxlength="500"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="admin-field">
+                <label class="admin-field__label" for="new-event-badge-default">Cor do badge (menu e movimentações)</label>
+                <label class="admin-field__hint-row">
+                    <input
+                        id="new-event-badge-default"
+                        type="checkbox"
+                        name="badge_use_default"
+                        value="1"
+                        checked
+                    >
+                    Usar cor padrão do tema
+                </label>
+                <div id="new-event-badge-color-wrap" class="admin-event-badge-color-wrap" hidden>
+                    <input
+                        id="new-event-badge-color"
+                        type="color"
+                        name="badge_color"
+                        value="#0e7490"
+                        class="admin-event-badge-color-input"
+                        aria-label="Escolher cor do badge"
+                    >
+                </div>
+            </div>
+            <div class="admin-card__actions">
+                <button type="submit" class="admin-btn admin-btn--primary">
+                    <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                    Criar evento
+                </button>
+                <button
+                    type="button"
+                    class="admin-btn admin-btn--ghost"
+                    onclick="document.getElementById('form-novo-evento').hidden = true; this.closest('form').parentElement.previousElementSibling.querySelector('[aria-controls]').setAttribute('aria-expanded', 'false');"
+                >
+                    Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+
+    {# --- Lista de eventos ativos --- #}
+    {% if events %}
+    <div class="admin-table admin-events-list" role="table" aria-label="Eventos ativos">
+        <div class="admin-table__head admin-events-list__row" role="row">
+            <span role="columnheader">Evento</span>
+            <span class="admin-table__col--num" role="columnheader">Produtos</span>
+            <span class="admin-table__col--num" role="columnheader">Vendedores</span>
+            <span class="admin-events-list__created admin-table__col--num" role="columnheader">Criado em</span>
+            <span role="columnheader" class="admin-stock__actions-head">Ações</span>
+        </div>
+
+        {% for ev in events %}
+        <div class="admin-events-list__row" role="row">
+            <span class="admin-events-list__name">
+                <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+                <strong>{{ ev.name }}</strong>
+                {% set ev_badge_style = ev.badge_color | event_badge_style %}
+                {% if ev_badge_style %}
+                <span class="admin-nav__event-badge admin-events-list__badge-swatch" style="{{ ev_badge_style }}" title="Cor do badge deste evento">
+                    <i class="fa-solid fa-droplet" aria-hidden="true"></i>
+                </span>
+                {% endif %}
+                {% if ev.operations_closed %}
+                <span class="admin-badge admin-badge--warn">Encerrado</span>
+                {% endif %}
+                <span class="admin-badge admin-badge--info">{{ ev.operation_type | event_operation_type_label }}</span>
+                {% if ev.description %}
+                <small class="admin-stock__meta">{{ ev.description }}</small>
+                {% endif %}
+            </span>
+            <div class="admin-events-list__meta">
+                <span class="admin-events-list__stat admin-events-list__stat--products">{{ ev.products_count }}</span>
+                <span class="admin-events-list__stat admin-events-list__stat--sellers">{{ ev.sellers_count }}</span>
+                <span class="admin-stock__meta admin-events-list__created admin-table__col--num">{{ ev.created_at | datahora }}</span>
+            </div>
+            <span class="admin-stock__actions">
+                <a
+                    class="admin-btn admin-btn--ghost admin-btn--sm admin-btn--icon-only"
+                    href="{{ url_for('admin_event_detail', event_id=ev.id) }}"
+                    title="Gerenciar evento"
+                    aria-label="Gerenciar {{ ev.name }}"
+                >
+                    <i class="fa-solid fa-sliders" aria-hidden="true"></i>
+                </a>
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="admin-empty">
+        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i>
+        <p>Nenhum evento ativo. Crie o primeiro usando o botão acima.</p>
+    </div>
+    {% endif %}
+
+    {# --- Eventos arquivados (colapsados) --- #}
+    {% if events_archived %}
+    <details class="admin-events-archived" style="margin-top: 32px;">
+        <summary class="admin-events-archived__summary">
+            <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+            Eventos arquivados ({{ events_archived | length }})
+        </summary>
+        <div class="admin-table admin-events-list" role="table" aria-label="Eventos arquivados" style="margin-top: 12px;">
+            <div class="admin-table__head admin-events-list__row" role="row">
+                <span role="columnheader">Evento</span>
+                <span class="admin-table__col--num" role="columnheader">Produtos</span>
+                <span class="admin-table__col--num" role="columnheader">Vendedores</span>
+                <span class="admin-events-list__created admin-table__col--num" role="columnheader">Criado em</span>
+                <span role="columnheader" class="admin-stock__actions-head">Ações</span>
+            </div>
+            {% for ev in events_archived %}
+            <div class="admin-events-list__row admin-events-list__row--archived" role="row">
+                <span class="admin-events-list__name">
+                    <i class="fa-solid fa-box-archive" aria-hidden="true"></i>
+                    <strong>{{ ev.name }}</strong>
+                    {% set ev_arch_style = ev.badge_color | event_badge_style %}
+                    {% if ev_arch_style %}
+                    <span class="admin-nav__event-badge admin-events-list__badge-swatch" style="{{ ev_arch_style }}" title="Cor do badge deste evento">
+                        <i class="fa-solid fa-droplet" aria-hidden="true"></i>
+                    </span>
+                    {% endif %}
+                    {% if ev.description %}
+                    <small class="admin-stock__meta">{{ ev.description }}</small>
+                    {% endif %}
+                    <span class="admin-badge admin-badge--info">{{ ev.operation_type | event_operation_type_label }}</span>
+                    <span class="admin-badge admin-badge--neutral">Arquivado</span>
+                </span>
+                <div class="admin-events-list__meta">
+                    <span class="admin-events-list__stat admin-events-list__stat--products">{{ ev.products_count }}</span>
+                    <span class="admin-events-list__stat admin-events-list__stat--sellers">{{ ev.sellers_count }}</span>
+                    <span class="admin-stock__meta admin-events-list__created admin-table__col--num">{{ ev.created_at | datahora }}</span>
+                </div>
+                <span class="admin-stock__actions">
+                    <a
+                        class="admin-btn admin-btn--ghost admin-btn--sm"
+                        href="{{ url_for('admin_event_detail', event_id=ev.id) }}"
+                        title="Ver evento"
+                        aria-label="Ver {{ ev.name }}"
+                    >
+                        <i class="fa-solid fa-eye" aria-hidden="true"></i>
+                    </a>
+                    <form method="post" action="{{ url_for('admin_event_restore', event_id=ev.id) }}" style="display:contents;">
+                        {% include 'partials/csrf_field.html' %}
+                        <button type="submit" class="admin-btn admin-btn--ghost admin-btn--sm" title="Reativar evento" aria-label="Reativar {{ ev.name }}">
+                            <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                            Reativar
+                        </button>
+                    </form>
+                    <form
+                        method="post"
+                        action="{{ url_for('admin_event_delete', event_id=ev.id) }}"
+                        style="display:contents;"
+                        data-confirm="Todos os dados deste evento serão removidos do sistema. Esta ação não pode ser desfeita."
+                        data-confirm-title="Excluir evento {{ ev.name|e }}?"
+                        data-confirm-label="Excluir"
+                    >
+                        {% include 'partials/csrf_field.html' %}
+                        <button
+                            type="submit"
+                            class="admin-btn admin-btn--danger admin-btn--icon-only admin-btn--sm"
+                            title="Excluir evento"
+                            aria-label="Excluir {{ ev.name }}"
+                        >
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>
+                        </button>
+                    </form>
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    {% endif %}
+</section>
+<script>
+(function () {
+    var cb = document.getElementById('new-event-badge-default');
+    var wrap = document.getElementById('new-event-badge-color-wrap');
+    if (!cb || !wrap) return;
+    function sync() { wrap.hidden = cb.checked; }
+    cb.addEventListener('change', sync);
+    sync();
+})();
+</script>
+{% endblock %}

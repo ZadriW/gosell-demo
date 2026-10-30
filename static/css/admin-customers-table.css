@@ -1,0 +1,488 @@
+/* Carteira de clientes — templates/admin/customers.html (.admin-custv)
+   As tabelas do perfil do cliente (customer_detail.html) seguem com
+   .admin-customer-* do admin.css. */
+
+.admin-custv {
+    --cv-accent: var(--color-primary);
+    --cv-neutral-bg: var(--color-bg);
+    --cv-row-hover: rgba(14, 116, 144, 0.025);
+    --cv-info: #1d4ed8;
+    --cv-info-bg: rgba(37, 99, 235, 0.10);
+    --cv-gold: #b7791f;
+    --cv-gold-bg: rgba(234, 179, 8, 0.16);
+    --cv-silver: #64748b;
+    --cv-silver-bg: rgba(100, 116, 139, 0.14);
+    --cv-bronze: #9a5b2b;
+    --cv-bronze-bg: rgba(180, 105, 50, 0.14);
+    --cv-cols: 44px minmax(240px, 2.4fr) 76px minmax(170px, 1.35fr) minmax(104px, 0.8fr)
+               minmax(190px, 1.35fr) minmax(130px, 0.95fr) 48px;
+
+    border: 1px solid var(--color-border);
+    font-size: 13.5px;
+}
+
+html.admin-theme--dark .admin-custv {
+    --cv-neutral-bg: rgba(255, 255, 255, 0.05);
+    --cv-row-hover: rgba(255, 255, 255, 0.025);
+    --cv-info: var(--admin-info);
+    --cv-info-bg: var(--admin-info-bg);
+    --cv-gold: #facc15;
+    --cv-gold-bg: rgba(250, 204, 21, 0.13);
+    --cv-silver: #cbd5e1;
+    --cv-silver-bg: rgba(203, 213, 225, 0.12);
+    --cv-bronze: #f0a46b;
+    --cv-bronze-bg: rgba(240, 164, 107, 0.13);
+}
+
+/* ---------- Grade ---------- */
+.admin-custv > .admin-custv__head,
+.admin-custv .admin-custv__row {
+    display: grid;
+    grid-template-columns: var(--cv-cols);
+    column-gap: 16px;
+    align-items: center;
+}
+
+.admin-custv > .admin-custv__head {
+    padding: 11px 18px;
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.admin-custv__cell {
+    min-width: 0;
+}
+
+.admin-custv__cell--num {
+    text-align: right;
+}
+
+.admin-custv__cell--center {
+    text-align: center;
+}
+
+.admin-custv__cell--actions {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* ---------- Linha ---------- */
+.admin-custv .admin-custv__row {
+    position: relative;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--color-border);
+    transition: background var(--transition, 160ms);
+}
+
+.admin-custv .admin-custv__row:last-child {
+    border-bottom: none;
+}
+
+.admin-custv .admin-custv__row:hover {
+    background: var(--cv-row-hover);
+}
+
+/* Posição */
+.admin-custv__rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-width: 28px;
+    height: 24px;
+    padding: 0 7px;
+    border-radius: 999px;
+    color: var(--color-text-muted);
+    font-size: 12px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-custv__rank i {
+    font-size: 9.5px;
+}
+
+.admin-custv__row--top1 .admin-custv__rank { background: var(--cv-gold-bg); color: var(--cv-gold); }
+.admin-custv__row--top2 .admin-custv__rank { background: var(--cv-silver-bg); color: var(--cv-silver); }
+.admin-custv__row--top3 .admin-custv__rank { background: var(--cv-bronze-bg); color: var(--cv-bronze); }
+
+/* Cliente */
+.admin-custv__person {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.admin-custv__avatar {
+    display: inline-grid;
+    place-items: center;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(14, 116, 144, 0.08);
+    color: var(--color-primary);
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+html.admin-theme--dark .admin-custv__avatar {
+    background: var(--admin-tint, rgba(240, 192, 48, 0.12));
+}
+
+.admin-custv__person-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.admin-custv__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    font-size: 13.5px;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.admin-custv__name:hover,
+.admin-custv__name:focus-visible {
+    color: var(--color-primary);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.admin-custv__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px 10px;
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-custv__meta i {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+.admin-custv__tag {
+    padding: 0 6px;
+    border-radius: 5px;
+    background: var(--cv-neutral-bg);
+    color: var(--color-text);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+/* Pedidos */
+.admin-custv__orders {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+}
+
+.admin-custv__orders strong {
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-custv__orders small,
+.admin-custv__last small {
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+}
+
+/* Faturamento + participação */
+.admin-custv__revenue {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-custv__revenue-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.admin-custv__share {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-custv__bar {
+    flex: 1 1 auto;
+    height: 6px;
+    border-radius: 999px;
+    background: var(--cv-neutral-bg);
+    overflow: hidden;
+}
+
+.admin-custv__bar-fill {
+    display: block;
+    height: 100%;
+    min-width: 3px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--cv-accent), color-mix(in srgb, var(--cv-accent) 65%, #7c8cff));
+}
+
+.admin-custv__share-pct {
+    flex-shrink: 0;
+    min-width: 38px;
+    text-align: right;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+
+/* Ticket médio */
+.admin-custv__ticket {
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+/* Frequência */
+.admin-custv__pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 100%;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-custv__pill i {
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.admin-custv__pill--recurring {
+    background: var(--cv-info-bg);
+    color: var(--cv-info);
+}
+
+.admin-custv__pill--once {
+    background: var(--cv-neutral-bg);
+    color: var(--color-text-muted);
+}
+
+/* Última compra */
+.admin-custv__last {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-custv__last-date {
+    color: var(--color-text);
+    white-space: nowrap;
+}
+
+/* Perfil */
+.admin-custv__icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+    font-size: 13px;
+    text-decoration: none;
+    transition: border-color var(--transition, 160ms), color var(--transition, 160ms);
+}
+
+.admin-custv__icon-btn:hover,
+.admin-custv__icon-btn:focus-visible {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+/* Vazio */
+.admin-custv__empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 44px 18px;
+    text-align: center;
+    color: var(--color-text-muted);
+}
+
+.admin-custv__empty > i {
+    font-size: 28px;
+    opacity: 0.5;
+    margin-bottom: 6px;
+}
+
+.admin-custv__empty p {
+    margin: 0;
+}
+
+.admin-custv__empty-title {
+    font-weight: 700;
+    color: var(--color-text);
+}
+
+.admin-custv__empty-hint {
+    font-size: 13px;
+}
+
+/* ---------- Telas médias: some a coluna de pedidos (está no perfil) ---------- */
+@media (max-width: 1200px) {
+    .admin-custv {
+        --cv-cols: 40px minmax(220px, 2.3fr) minmax(160px, 1.35fr) minmax(100px, 0.8fr)
+                   minmax(170px, 1.3fr) minmax(120px, 0.95fr) 44px;
+    }
+
+    .admin-custv__head > :nth-child(3),
+    .admin-custv .admin-custv__orders {
+        display: none;
+    }
+}
+
+/* ---------- Celular: cada cliente vira um cartão ---------- */
+@media (max-width: 860px) {
+    .admin-custv {
+        border: none;
+        background: transparent;
+        box-shadow: none;
+        overflow: visible;
+    }
+
+    .admin-custv > .admin-custv__head {
+        display: none;
+    }
+
+    .admin-custv .admin-custv__row {
+        grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas:
+            "person person  person  action"
+            "orders revenue revenue ticket"
+            "freq   freq    last    last";
+        gap: 12px 10px;
+        margin-bottom: 10px;
+        padding: 14px;
+        border: 1px solid var(--color-border);
+        border-radius: 14px;
+        background: var(--color-surface);
+        box-shadow: var(--shadow-sm);
+    }
+
+    .admin-custv .admin-custv__row:last-child {
+        border-bottom: 1px solid var(--color-border);
+    }
+
+    /* Posição: selinho sobre o canto do avatar, sem roubar largura do nome */
+    .admin-custv .admin-custv__row > :nth-child(1) {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 1;
+    }
+
+    .admin-custv .admin-custv__row > :nth-child(1) .admin-custv__rank {
+        min-width: 20px;
+        height: 18px;
+        padding: 0 5px;
+        border: 1px solid var(--color-border);
+        background: var(--color-surface);
+        font-size: 10px;
+    }
+
+    .admin-custv__row--top1 > :nth-child(1) .admin-custv__rank,
+    .admin-custv__row--top2 > :nth-child(1) .admin-custv__rank,
+    .admin-custv__row--top3 > :nth-child(1) .admin-custv__rank {
+        border-color: transparent;
+    }
+
+    .admin-custv__row--top1 > :nth-child(1) .admin-custv__rank { background: #fdf3d6; }
+    .admin-custv__row--top2 > :nth-child(1) .admin-custv__rank { background: #eceff3; }
+    .admin-custv__row--top3 > :nth-child(1) .admin-custv__rank { background: #f6e7dc; }
+
+    html.admin-theme--dark .admin-custv__row--top1 > :nth-child(1) .admin-custv__rank,
+    html.admin-theme--dark .admin-custv__row--top2 > :nth-child(1) .admin-custv__rank,
+    html.admin-theme--dark .admin-custv__row--top3 > :nth-child(1) .admin-custv__rank {
+        background: var(--color-surface);
+        border-color: currentColor;
+    }
+
+    .admin-custv .admin-custv__pill {
+        white-space: normal;
+        line-height: 1.3;
+    }
+    .admin-custv .admin-custv__row > .admin-custv__person { grid-area: person; }
+    .admin-custv .admin-custv__row > .admin-custv__cell--actions { grid-area: action; }
+    .admin-custv .admin-custv__row > .admin-custv__orders { grid-area: orders; display: flex; }
+    .admin-custv .admin-custv__row > .admin-custv__revenue { grid-area: revenue; }
+    .admin-custv .admin-custv__row > .admin-custv__ticket { grid-area: ticket; }
+    .admin-custv .admin-custv__row > .admin-custv__freq { grid-area: freq; align-self: center; }
+    .admin-custv .admin-custv__row > .admin-custv__last {
+        grid-area: last;
+        align-items: flex-end;
+        text-align: right;
+    }
+
+    /* Pedidos, faturamento e ticket em caixinhas com rótulo */
+    .admin-custv .admin-custv__row > [data-label] {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+        min-width: 0;
+        padding: 8px 10px;
+        border-radius: 10px;
+        background: var(--cv-neutral-bg);
+        text-align: left;
+    }
+
+    .admin-custv .admin-custv__row > [data-label]::before {
+        content: attr(data-label);
+        font-size: 9.5px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--color-text-muted);
+    }
+
+    .admin-custv .admin-custv__row > .admin-custv__ticket {
+        font-weight: 600;
+        font-size: 12.5px;
+    }
+
+    .admin-custv .admin-custv__row > .admin-custv__revenue .admin-custv__share {
+        width: 100%;
+    }
+
+    .admin-custv__bar {
+        background: var(--color-surface);
+    }
+
+    .admin-custv__avatar {
+        width: 34px;
+        height: 34px;
+    }
+}

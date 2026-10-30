@@ -1,0 +1,143 @@
+{% extends "admin/_layout.html" %}
+
+{% block title %}Dashboard - Admin | Go Sell{% endblock %}
+
+{% block admin_body %}
+<section class="admin-section">
+    <header class="admin-section__header">
+        <h1 class="admin-section__title">Visão geral</h1>
+        <p class="admin-section__subtitle">Métricas agregadas de vendas confirmadas, catálogo e inventário nos eventos.</p>
+    </header>
+
+    <div class="admin-kpis">
+        <article class="kpi kpi--primary">
+            <span class="kpi__icon"><i class="fa-solid fa-receipt" aria-hidden="true"></i></span>
+            <span class="kpi__label">Transações totais</span>
+            <span class="kpi__value">{{ stats.transactions_count }}</span>
+            <span class="kpi__hint">{{ stats.transactions_today }} hoje</span>
+        </article>
+
+        <article class="kpi kpi--success">
+            <span class="kpi__icon"><i class="fa-solid fa-sack-dollar" aria-hidden="true"></i></span>
+            <span class="kpi__label">Montante arrecadado</span>
+            <span class="kpi__value">{{ stats.total_revenue | brl }}</span>
+            <span class="kpi__hint">{{ stats.revenue_today | brl }} hoje</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-boxes-stacked" aria-hidden="true"></i></span>
+            <span class="kpi__label">Itens vendidos</span>
+            <span class="kpi__value">{{ stats.items_sold }}</span>
+            <span class="kpi__hint">Unidades totais</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-chart-line" aria-hidden="true"></i></span>
+            <span class="kpi__label">Ticket médio</span>
+            <span class="kpi__value">
+                {% if stats.transactions_count > 0 %}
+                    {{ (stats.total_revenue / stats.transactions_count) | brl }}
+                {% else %}
+                    {{ 0 | brl }}
+                {% endif %}
+            </span>
+            <span class="kpi__hint">Por transação</span>
+        </article>
+    </div>
+</section>
+
+<section class="admin-section">
+    <header class="admin-section__header admin-section__header--row">
+        <div>
+            <h2 class="admin-section__title">Produtos e inventário nos eventos</h2>
+            <p class="admin-section__subtitle">Catálogo e quantidades somadas em todos os eventos ativos.</p>
+        </div>
+        <a class="admin-btn admin-btn--primary" href="{{ url_for('admin_products') }}">
+            <i class="fa-solid fa-arrow-right-long" aria-hidden="true"></i>
+            Ver biblioteca de produtos
+        </a>
+    </header>
+
+    <div class="admin-kpis">
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-tags" aria-hidden="true"></i></span>
+            <span class="kpi__label">Produtos cadastrados</span>
+            <span class="kpi__value">{{ stock.products_count }}</span>
+            <span class="kpi__hint">{{ stock.products_active }} ativos</span>
+        </article>
+
+        <article class="kpi">
+            <span class="kpi__icon"><i class="fa-solid fa-warehouse" aria-hidden="true"></i></span>
+            <span class="kpi__label">Unidades nos eventos</span>
+            <span class="kpi__value">{{ stock.units_in_stock }}</span>
+            <span class="kpi__hint">Soma das quantidades por produto em todos os eventos</span>
+        </article>
+
+        <article class="kpi kpi--success">
+            <span class="kpi__icon"><i class="fa-solid fa-coins" aria-hidden="true"></i></span>
+            <span class="kpi__label">Valor em estoque</span>
+            <span class="kpi__value">{{ stock.stock_value | brl }}</span>
+            <span class="kpi__hint">Preço de venda × quantidades nos eventos</span>
+        </article>
+
+        <article class="kpi {% if stock.below_min > 0 %}kpi--warn{% endif %}">
+            <span class="kpi__icon"><i class="fa-solid fa-triangle-exclamation" aria-hidden="true"></i></span>
+            <span class="kpi__label">Abaixo do mínimo</span>
+            <span class="kpi__value">{{ stock.below_min }}</span>
+            <span class="kpi__hint">{{ stock.out_of_stock }} sem estoque</span>
+        </article>
+    </div>
+</section>
+
+<section class="admin-section admin-section--danger-zone" aria-labelledby="adminDangerZoneHeading">
+    <div class="admin-danger-zone__toolbar">
+        <button
+            type="button"
+            id="adminDangerZoneToggle"
+            class="admin-danger-zone__toggle"
+            aria-expanded="false"
+            aria-controls="adminDangerZonePanel"
+        >
+            <span class="admin-danger-zone__chevron-wrap" aria-hidden="true">
+                <i class="fa-solid fa-chevron-down admin-danger-zone__chevron"></i>
+            </span>
+            <span class="admin-danger-zone__toggle-label">
+                <h2 id="adminDangerZoneHeading" class="admin-section__title admin-danger-zone__heading-line">Reinício do sistema</h2>
+                <span class="admin-danger-zone__collapsed-hint">Use a seta para mostrar ou ocultar o aviso e as opções.</span>
+            </span>
+        </button>
+    </div>
+
+    <div id="adminDangerZonePanel" class="admin-danger-zone__panel" hidden>
+        <p class="admin-section__subtitle admin-danger-zone__subtitle">
+            Use apenas para repetir a demonstração.
+            Esta ação restaura os eventos, produtos, promoções, brindes, usuários,
+            clientes, vendas de exemplo e a fila do ERP simulado.
+            Não é possível desfazer.
+        </p>
+
+        <div class="admin-reset-panel">
+            <form
+                method="post"
+                action="{{ url_for('admin_reset_system') }}"
+                class="admin-reset-form"
+                id="adminResetForm"
+            >
+                {% include 'partials/csrf_field.html' %}
+                <label class="admin-reset-confirm">
+                    <input type="checkbox" name="confirm_reset" value="1" id="adminResetConfirm">
+                    <span>Entendo que esta operação é irreversível e desejo reiniciar o sistema.</span>
+                </label>
+                <button type="submit" class="admin-btn admin-btn--danger-solid" id="adminResetSubmit" disabled>
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                    Reiniciar sistema ao estado padrão
+                </button>
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block admin_scripts %}
+<script src="{{ url_for('static', filename='js/admin-reset.js') }}"></script>
+{% endblock %}

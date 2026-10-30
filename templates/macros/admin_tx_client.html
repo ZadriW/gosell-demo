@@ -1,0 +1,84 @@
+{# Bloco "Dados do cliente (Pedido)" nos detalhes da transação (admin-tx__details). #}
+{% macro admin_tx_client_section(tx) -%}
+{% set cn = (tx.client_name or '')|trim %}
+{% set cpf = (tx.client_cpf or '')|trim %}
+{% set email = (tx.client_email or '')|trim %}
+{% set phone = (tx.client_phone or '')|trim %}
+{% set zipc = (tx.client_zipcode or '')|trim %}
+{% set addr = (tx.client_address or '')|trim %}
+{% set num = (tx.client_number or '')|trim %}
+{% set comp = (tx.client_complement or '')|trim %}
+{% set city = (tx.client_city or '')|trim %}
+{% set hood = (tx.client_neighborhood or '')|trim %}
+{% set st = (tx.client_state or '')|trim %}
+{% set cro_uf = (tx.client_cro_uf or '')|trim %}
+{% set cro_num = (tx.client_cro_numero or '')|trim %}
+{% set has_client = cn or cpf or email or phone or zipc or addr or num or comp or hood or city or st or cro_uf or cro_num %}
+{% if has_client %}
+<h3 class="admin-tx__details-title">
+    Dados do cliente (Pedido)
+</h3>
+<div class="admin-tx__client" role="region" aria-label="Dados do cliente do pedido">
+    <dl class="admin-tx__client-grid">
+        {% if cn %}
+        <div class="admin-tx__client-item">
+            <dt>Nome</dt>
+            <dd>{{ cn }}</dd>
+        </div>
+        {% endif %}
+        {% if cpf %}
+        <div class="admin-tx__client-item">
+            <dt>CPF</dt>
+            <dd>{{ cpf }}</dd>
+        </div>
+        {% endif %}
+        {% if email %}
+        <div class="admin-tx__client-item">
+            <dt>E-mail</dt>
+            <dd><a href="mailto:{{ email }}" class="admin-tx__client-link">{{ email }}</a></dd>
+        </div>
+        {% endif %}
+        {% if phone %}
+        <div class="admin-tx__client-item">
+            <dt>Telefone</dt>
+            <dd>{{ phone }}</dd>
+        </div>
+        {% endif %}
+        {% if cro_uf or cro_num %}
+        <div class="admin-tx__client-item">
+            <dt>CRO</dt>
+            <dd>{% if cro_uf %}{{ cro_uf }}{% endif %}{% if cro_uf and cro_num %} · {% endif %}{% if cro_num %}<span class="admin-tx__client-cro-num">{{ cro_num }}</span>{% endif %}</dd>
+        </div>
+        {% endif %}
+        {% if zipc %}
+        <div class="admin-tx__client-item">
+            <dt>CEP</dt>
+            <dd>{{ zipc }}</dd>
+        </div>
+        {% endif %}
+        {% if addr or num or comp %}
+        <div class="admin-tx__client-item admin-tx__client-item--wide">
+            <dt>Endereço</dt>
+            <dd>
+                {% if addr %}{{ addr }}{% endif %}
+                {% if num %}{% if addr %}, {% endif %}nº {{ num }}{% endif %}
+                {% if comp %}{% if addr or num %} · {% endif %}{{ comp }}{% endif %}
+                {% if hood %}{% if addr or num or comp %} · {% endif %}{{ hood }}{% endif %}
+            </dd>
+        </div>
+        {% endif %}
+        {% if city or st %}
+        <div class="admin-tx__client-item admin-tx__client-item--wide">
+            <dt>Cidade / UF</dt>
+            <dd>
+                {% if city and st %}{{ city }} / {{ st }}
+                {% elif city %}{{ city }}
+                {% elif st %}{{ st }}
+                {% endif %}
+            </dd>
+        </div>
+        {% endif %}
+    </dl>
+</div>
+{% endif %}
+{%- endmacro %}
